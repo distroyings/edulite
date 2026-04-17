@@ -376,17 +376,21 @@ export class Router {
   constructor(routes) {
     this.routes = routes;
     this.app = document.getElementById('app');
+    this._initialRouteHandled = false;
 
-    // Handle initial load and back/forward buttons
+    // Handle back/forward buttons
     window.addEventListener('popstate', () => this.handleRoute());
-    window.addEventListener('load', () => this.handleRoute());
+
+    // NOTE: We intentionally do NOT handle the 'load' event here.
+    // Initial routing is triggered by main.js AFTER Supabase confirms
+    // auth state via INITIAL_SESSION, preventing the race condition
+    // where guarded routes redirect to /login before session is restored.
 
     // Global click listener for SPA navigation
     document.addEventListener('click', (e) => {
       const link = e.target.closest('a');
       if (link) {
         const href = link.getAttribute('href');
-        // Check if it's an internal link (starts with / and not external)
         if (href && href.startsWith('/') && !href.startsWith('//') && !link.hasAttribute('target')) {
           e.preventDefault();
           this.navigate(href);
@@ -521,6 +525,14 @@ export class Router {
             const target = document.getElementById(id);
             if (target) target.scrollIntoView({ behavior: 'smooth' });
           }, 100);
+        }
+      } else if (this.currentRoute !== normalizedPath) {
+        // Route identity matches but actual path changed (e.g. browser
+        // Back/Forward between /class/abc/notes and /class/abc/stream).
+        // Notify the component to update its sub-state without remounting.
+        this.currentRoute = normalizedPath;
+        if (this.currentComponent && typeof this.currentComponent.onRouteUpdate === 'function') {
+          this.currentComponent.onRouteUpdate(normalizedPath, params);
         }
       }
     } else {

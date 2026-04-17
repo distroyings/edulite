@@ -1248,8 +1248,15 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         realtimeManager.unsubscribeByPrefix(`class:${classId}:`);
     };
 
-    // switchTab is handled by the setTimeout logic at the top of the file
-    // to properly support direct linking to specific tabs.
+    // Called by the router when sub-route changes (e.g. browser Back/Forward
+    // between /class/abc/notes and /class/abc/stream) without remounting.
+    wrapper.onRouteUpdate = (newPath, params) => {
+        const newTab = params[1] || 'stream'; // params = [classId, tab]
+        if (newTab !== currentTab && tabDefs.find(td => td.id === newTab)) {
+            switchTab(newTab);
+        }
+    };
+
     container.appendChild(main);
     wrapper.appendChild(container);
     return wrapper;

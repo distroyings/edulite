@@ -48,24 +48,50 @@ window.appRouter = router;
 const AUTH_ONLY_ROUTES = ['/login', '/signup', '/forgot-password'];
 const PUBLIC_ROUTES = ['/', '/home', '/docs', '/changelog', '/changelogs'];
 
+// ── INITIAL ROUTING ──
+// Determine if current path needs auth. For public/auth routes,
+// render immediately. For guarded routes, wait for Supabase to
+// confirm the session (INITIAL_SESSION) before routing, so we
+// don't lose deep links.
+const initialPath = window.location.pathname;
+const isPublicOrAuth = PUBLIC_ROUTES.includes(initialPath) ||
+    AUTH_ONLY_ROUTES.includes(initialPath);
+
+if (isPublicOrAuth) {
+    // Public routes can render immediately — no auth needed
+    router.handleRoute();
+}
+
 if (supabase) {
     supabase.auth.onAuthStateChange((event, session) => {
         const path = window.location.pathname;
 
         // INITIAL_SESSION fires on page load/refresh
-        if (event === 'INITIAL_SESSION' && session) {
-            import('./features/auth/services/authService.js').then(m => m.authService.ensureProfile());
+        if (event === 'INITIAL_SESSION') {
+            if (session) {
+                import('./features/auth/services/authService.js').then(m => m.authService.ensureProfile());
 
-            const isOAuthCallback = window.location.hash.includes('access_token') || window.location.search.includes('code=');
+                const isOAuthCallback = window.location.hash.includes('access_token') || window.location.search.includes('code=');
 
-            if (isOAuthCallback) {
-                window.history.replaceState(null, '', '/dashboard');
-                router.handleRoute();
-                return;
-            }
+                if (isOAuthCallback) {
+                    window.history.replaceState(null, '', '/dashboard');
+                    router.handleRoute();
+                    return;
+                }
 
-            if (AUTH_ONLY_ROUTES.includes(path)) {
-                router.navigate('/dashboard');
+                if (AUTH_ONLY_ROUTES.includes(path)) {
+                    // User is logged in but on login/signup page → go to dashboard
+                    router.navigate('/dashboard');
+                } else if (!isPublicOrAuth) {
+                    // This is a guarded route (e.g., /class/abc/notes, /messages/xyz)
+                    // Session is confirmed, NOW we can safely route
+                    router.handleRoute();
+                }
+            } else {
+                // No session — if user is on a guarded deep link, send to login
+                if (!isPublicOrAuth) {
+                    router.navigate('/login');
+                }
             }
             return;
         }
@@ -79,7 +105,6 @@ if (supabase) {
 
         if (event === 'SIGNED_OUT') {
             // Only redirect to login if we are on a guarded route
-            // (not public, and not already an auth page)
             const isPublic = PUBLIC_ROUTES.includes(path);
             const isAuth = AUTH_ONLY_ROUTES.includes(path);
 
@@ -88,6 +113,9 @@ if (supabase) {
             }
         }
     });
+} else {
+    // No Supabase configured — just route immediately
+    if (!isPublicOrAuth) {
+        router.handleRoute();
+    }
 }
-
-

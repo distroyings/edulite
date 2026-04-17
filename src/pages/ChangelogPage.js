@@ -39,6 +39,30 @@ export async function ChangelogPage() {
     // --- RELEASES DATA ---
     const releases = [
         {
+            date: '18 Abr 2026',
+            title: 'Arquitetura de Deep Links & Navegação Instantânea',
+            description: 'Restruturação completa do sistema de rotas para suportar deep links, cache de separadores, e navegação instantânea sem remontagem de página.',
+            categories: {
+                new: [
+                    'Deep Links completos: ao atualizar a página em /class/id/notes ou /messages/chatId, a posição exata é restaurada sem perder o contexto.',
+                    'Botão Voltar/Avançar do browser agora alterna separadores da turma e conversas sem recarregar a página.',
+                    'Componentes registam callback onRouteUpdate — o router informa sub-navegações em vez de remontar tudo.',
+                ],
+                improvement: [
+                    'Cache de separadores SaaS: trocar de separador numa turma é agora instantâneo — o conteúdo anterior é preservado em memória.',
+                    'Eliminada condição de corrida (race condition) entre o Router e o Supabase Auth: sessões guardadas são confirmadas antes de qualquer redirecionamento.',
+                    'Router utiliza \"identidade de rota\" — /class/abc/notes e /class/abc/stream são a mesma página, apenas o separador muda.',
+                    'O primeiro carregamento utiliza replaceState (sem duplicação de histórico); cliques do utilizador utilizam pushState para suporte correto do botão Voltar.'
+                ],
+                fix: [
+                    'Barra de navegação mobile deixou de desaparecer ao atualizar a página em deep links protegidos.',
+                    'Corrigido o bug onde atualizar em /class/id/tab ou /messages/chatId redirecionava para o Dashboard em vez de preservar a rota.',
+                    'Eliminada dupla entrada no histórico do browser ao carregar página com separador específico.',
+                    'Restauração da barra inferior mobile após sair de uma conversa no chat.'
+                ]
+            }
+        },
+        {
             date: '17 Abr 2026',
             title: 'Sincronização em Tempo Real Ultra-Rápida & Global',
             description: 'Massivas otimizações e estabilidade no chat em tempo real, novas notificações globais e melhor experiência de UI.',

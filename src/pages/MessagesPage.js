@@ -274,11 +274,25 @@ export async function MessagesPage(initialChatId = null) {
         window.removeEventListener('resize', onResize);
         if (currentWindow?.cleanup) currentWindow.cleanup();
         clearTimeout(sidebarRefreshTimer);
-        // Cleanup sidebar subscription
         realtimeManager.unsubscribe('sidebar:messages');
         // Restore mobile bottom nav when leaving Messages page
         const mobileBottomNav = document.getElementById('mobile-bottom-nav');
         if (mobileBottomNav) mobileBottomNav.style.display = '';
+    };
+
+    // Called by the router when sub-route changes (e.g. browser Back/Forward
+    // between /messages/chatA and /messages or /messages/chatB).
+    container.onRouteUpdate = (newPath, params) => {
+        const newChatId = params[0] || null; // params = [chatId] or []
+        if (newChatId) {
+            const chat = chats.find(c => c.id === newChatId);
+            if (chat && activeChat?.id !== newChatId) {
+                loadWindow(chat);
+            }
+        } else if (activeChat) {
+            // Back to /messages — close the chat
+            loadWindow(null);
+        }
     };
 
     return container;
