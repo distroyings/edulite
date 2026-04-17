@@ -1245,8 +1245,8 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         realtimeManager.unsubscribeByPrefix(`class:${classId}:`);
     };
 
-    switchTab('stream');
-
+    // switchTab is handled by the setTimeout logic at the top of the file
+    // to properly support direct linking to specific tabs.
     container.appendChild(main);
     wrapper.appendChild(container);
     return wrapper;
