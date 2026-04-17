@@ -63,6 +63,7 @@ export async function MessagesPage(initialChatId = null) {
     let currentWindow = null;
     let chats = [];
     let isMobile = window.innerWidth < 768;
+    let hasUserInteracted = false; // Track if this is the initial deep-link restoration
 
     const onResize = () => {
         const wasMobile = isMobile;
@@ -97,14 +98,16 @@ export async function MessagesPage(initialChatId = null) {
             if (isMobile) {
                 chatContainer.style.display = 'none';
                 sidebarContainer.style.display = 'flex';
-                if (mobileBottomNav) mobileBottomNav.style.display = '';
             }
+            // Always restore mobile bottom nav when closing a chat
+            if (mobileBottomNav) mobileBottomNav.style.display = '';
+
             currentWindow = ChatWindow(null);
             chatContainer.appendChild(currentWindow);
             renderSidebar();
             
             // Sync URL
-            window.history.pushState(null, '', '/messages');
+            window.history.replaceState(null, '', '/messages');
             if (window.appRouter) window.appRouter.currentRoute = '/messages';
             
             return;
@@ -127,8 +130,14 @@ export async function MessagesPage(initialChatId = null) {
         chatContainer.appendChild(currentWindow);
         renderSidebar();
 
-        // Sync URL
-        window.history.pushState(null, '', `/messages/${chat.id}`);
+        // Sync URL — replaceState if this is the initial load from a deep link,
+        // pushState for user-initiated chat opens
+        const isRestoringDeepLink = initialChatId && chat.id === initialChatId && !hasUserInteracted;
+        if (isRestoringDeepLink) {
+            window.history.replaceState(null, '', `/messages/${chat.id}`);
+        } else {
+            window.history.pushState(null, '', `/messages/${chat.id}`);
+        }
         if (window.appRouter) window.appRouter.currentRoute = `/messages/${chat.id}`;
     };
 
@@ -187,6 +196,8 @@ export async function MessagesPage(initialChatId = null) {
             loadWindow(chatToOpen);
         }
     }
+    // After initial restoration, mark all future interactions as user-initiated
+    hasUserInteracted = true;
 
     // Live sidebar updates: when a new message arrives, update preview in-place (no full refetch)
     let sidebarRefreshTimer = null;

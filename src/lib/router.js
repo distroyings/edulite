@@ -412,6 +412,21 @@ export class Router {
     console.log('OAuth redirect detected via hash');
   }
 
+  /**
+   * Derive a "route identity" from a path.
+   * For parameterised routes like /class/:id/:tab we treat the base
+   * /class/<id> as the identity so that in-page tab switches via
+   * pushState don't trigger a full page remount.
+   * For /messages/:chatId we treat /messages as the identity.
+   */
+  _routeIdentity(path) {
+    // /class/<uuid>/notes  →  /class/<uuid>
+    if (/^\/class\/[^/]+\/[^/]+$/.test(path)) return path.replace(/\/[^/]+$/, '');
+    // /messages/<uuid>  →  /messages
+    if (/^\/messages\/[^/]+$/.test(path)) return '/messages';
+    return path;
+  }
+
   async handleRoute() {
     const path = window.location.pathname;
     const search = window.location.search; // Keep query params if needed
@@ -428,13 +443,23 @@ export class Router {
 
     if (route) {
       if (route.guard && !await this.checkAuth()) {
-        // Redirect to login if not authenticated
-        // Store current path to redirect back later if needed (optional enhancement)
         this.navigate('/login');
         return;
       }
 
-      if (this.currentRoute !== normalizedPath) {
+      // Always restore mobile bottom nav visibility on guarded routes
+      // (it may have been hidden by MessagesPage or other components)
+      if (route.guard) {
+        const mbn = document.getElementById('mobile-bottom-nav');
+        if (mbn) mbn.style.display = '';
+      }
+
+      // Compare route identity so in-page sub-navigations (tab switches,
+      // chat opens) don't trigger a full page remount.
+      const newIdentity = this._routeIdentity(normalizedPath);
+      const oldIdentity = this._routeIdentity(this.currentRoute || '');
+
+      if (newIdentity !== oldIdentity) {
         if (this.currentComponent && typeof this.currentComponent.cleanup === 'function') {
           this.currentComponent.cleanup();
         }
@@ -442,7 +467,6 @@ export class Router {
         realtimeManager.cleanup();
 
         /* Remove body-mounted navbars on non-guarded (public) routes AND admin routes */
-        // Check if route is admin (starts with /admin)
         const isAdminRoute = normalizedPath.startsWith('/admin');
         if (!route.guard || isAdminRoute) {
           document.getElementById('app-header')?.remove();

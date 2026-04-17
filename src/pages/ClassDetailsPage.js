@@ -188,6 +188,8 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
 
     // Tab switching
     let currentTab = 'stream';
+    let isInitialSwitch = true; // Track first switch to use replaceState
+
     const switchTab = (tabId) => {
         currentTab = tabId;
         tabDefs.forEach(td => {
@@ -215,9 +217,16 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
             if (tabId === 'chat') renderChat();
         }
         
-        // Sync URL
+        // Sync URL — use replaceState on initial load to avoid duplicate
+        // history entries; pushState on user-initiated tab clicks for
+        // proper back-button support.
         const newPath = `/class/${classId}/${tabId}`;
-        window.history.pushState(null, '', newPath);
+        if (isInitialSwitch) {
+            window.history.replaceState(null, '', newPath);
+            isInitialSwitch = false;
+        } else {
+            window.history.pushState(null, '', newPath);
+        }
         if (window.appRouter) window.appRouter.currentRoute = newPath;
     };
 
@@ -225,15 +234,9 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         tabs.querySelector(`#tab-${tab.id}`).onclick = () => switchTab(tab.id);
     });
 
-    // Initial active tab
-    // We defer slightly to let the UI settle before rendering heavy tabs
-    setTimeout(() => {
-        if (tabDefs.find(t => t.id === initialTab)) {
-            switchTab(initialTab);
-        } else {
-            switchTab('stream');
-        }
-    }, 0);
+    // Initial active tab — load the tab requested in the URL (or default to stream)
+    const resolvedInitialTab = tabDefs.find(td => td.id === initialTab) ? initialTab : 'stream';
+    switchTab(resolvedInitialTab);
 
     // ═══════════════════════════════════════════════════
     //  STREAM TAB (Assignments)
