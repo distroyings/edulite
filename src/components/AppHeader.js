@@ -1,6 +1,8 @@
 import { authService } from '../features/auth/services/authService.js';
 import { profileService } from '../services/profileService.js';
 import { notificationService } from '../services/notificationService.js';
+import { chatService } from '../services/chatService.js';
+import { realtimeManager } from '../lib/RealtimeManager.js';
 import { t } from '../lib/i18n.js';
 import { getAvatar } from '../lib/avatar.js';
 import { Logo } from './Logo.js';
@@ -44,7 +46,7 @@ export async function AppHeader() {
                     ${createNavLink('/dashboard', 'Painel', Icons.dashboard)}
                     ${createNavLink('/classes', 'Turmas', Icons.classes)}
                     ${createNavLink('/calendar', t('sidebar.calendar'), Icons.calendar)}
-                    ${createNavLink('/messages', t('sidebar.messages'), Icons.messages)}
+                    ${createNavLink('/messages', t('sidebar.messages'), Icons.messages, 'nav-msg-desktop')}
                     ${createNavLink('/changelog', 'Changelog', Icons.changelog)}
                 </nav>
             </div>
@@ -52,8 +54,6 @@ export async function AppHeader() {
             <!-- Right: Actions -->
             <div class="flex items-center gap-3">
                 
-
-
                 <!-- Theme Toggle -->
                 <button id="header-theme-toggle" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-muted hover:text-primary transition-colors">
                    <span class="dark:hidden">${Icons.moon}</span>
@@ -150,7 +150,7 @@ export async function AppHeader() {
             ${Icons.calendar}
             <span class="text-[10px]">${t('sidebar.calendar')}</span>
         </a>
-        <a href="/messages" class="flex flex-col items-center gap-1 p-2 text-xs font-medium transition-colors ${window.location.pathname === '/messages' ? 'text-neon' : 'text-muted hover:text-primary'}">
+        <a id="nav-msg-mobile" href="/messages" class="relative flex flex-col items-center gap-1 p-2 text-xs font-medium transition-colors ${window.location.pathname === '/messages' ? 'text-neon' : 'text-muted hover:text-primary'}">
             ${Icons.messages}
             <span class="text-[10px]">Mensagens</span>
         </a>
@@ -424,6 +424,49 @@ export async function AppHeader() {
                 setTimeout(() => { if (toast.parentElement) { toast.style.opacity = '0'; toast.style.transition = 'opacity .3s'; setTimeout(() => toast.remove(), 300); } }, 5000);
             }
         });
+
+        // Chat Unread Badge Logic
+        const updateChatBadge = async () => {
+            try {
+                const count = await chatService.getUnreadTotalCount();
+                const dLink = document.getElementById('nav-msg-desktop');
+                const mLink = document.getElementById('nav-msg-mobile');
+                
+                const renderBadge = (link) => {
+                    if (!link) return;
+                    let badge = link.querySelector('.chat-badge');
+                    if (count > 0) {
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'chat-badge absolute top-1 right-1 sm:top-0 sm:right-2 w-2.5 h-2.5 bg-neon rounded-full border-2 border-background animate-pulse';
+                            link.appendChild(badge);
+                        }
+                    } else if (badge) {
+                        badge.remove();
+                    }
+                };
+                renderBadge(dLink);
+                renderBadge(mLink);
+            } catch(e) {}
+        };
+        updateChatBadge();
+
+        realtimeManager.subscribe('appheader:messages', 'messages', null, ['INSERT'], (payload) => {
+            const path = window.location.pathname;
+            if (payload?.data?.sender_id !== user.id) {
+                 if (!path.startsWith(`/class/${payload.data.chat_id}`) && path !== '/messages') {
+                     const dLink = document.getElementById('nav-msg-desktop');
+                     const mLink = document.getElementById('nav-msg-mobile');
+                     [dLink, mLink].forEach(link => {
+                         if (link && !link.querySelector('.chat-badge')) {
+                             const badge = document.createElement('span');
+                             badge.className = 'chat-badge absolute top-1 right-1 sm:top-0 sm:right-2 w-2.5 h-2.5 bg-neon rounded-full border-2 border-background animate-pulse';
+                             link.appendChild(badge);
+                         }
+                     });
+                 }
+            }
+        });
     }
 
     // Toggle Popup
@@ -459,14 +502,14 @@ export async function AppHeader() {
     return fragment;
 }
 
-function createNavLink(href, text, icon) {
+function createNavLink(href, text, icon, id = '') {
     const isActive = window.location.pathname.startsWith(href);
     const activeClass = isActive
         ? 'bg-white shadow-sm text-black dark:bg-white/[0.08] dark:text-white dark:border dark:border-white/10'
         : 'text-muted hover:text-primary hover:bg-black/5 dark:hover:bg-white/5';
 
     return `
-    <a href="${href}" class="flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${activeClass}">
+    <a ${id ? `id="${id}"` : ''} href="${href}" class="relative flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${activeClass}">
         ${icon}
         <span>${text}</span>
     </a>

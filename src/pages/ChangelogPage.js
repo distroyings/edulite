@@ -40,10 +40,20 @@ export async function ChangelogPage() {
     const releases = [
         {
             date: '17 Abr 2026',
-            title: 'Correção no Registo',
-            description: 'Resolução de problemas que impossibilitavam o uso de nomes de utilizador personalizados.',
+            title: 'Sincronização em Tempo Real Ultra-Rápida & Global',
+            description: 'Massivas otimizações e estabilidade no chat em tempo real, novas notificações globais e melhor experiência de UI.',
             categories: {
+                new: [
+                    'Indicador global de mensagens (Bolhinha vermelha) na navegação quando há mensagens não lidas, mesmo noutras páginas.',
+                    'Receção de notificações e sincronização no background (RealtimeManager) unificada e conectada com fiabilidade.'
+                ],
+                improvement: [
+                    'Atualização "Optimistic UI" no chat: envio e eliminação de mensagens são instantâneos, sem esperas de carregamento da rede ou recarregamentos da página.',
+                    'Transição e melhoria do envio seguro de ficheiros e anexos na conversa.'
+                ],
                 fix: [
+                    'Correção de "Aviso de Boas-Vindas" spamming a surgir em múltiplos dispositivos a cada sessão.',
+                    'Problemas da mensagem não sincronizada noutras instâncias ou a ficar presa se o canal não estivesse "SUBSCRIBED" foram solucionados.',
                     'Correção do erro na validação do username (aparecia sempre indisponível) durante o processo de registo.'
                 ]
             }

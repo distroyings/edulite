@@ -454,25 +454,40 @@ export class Router {
         this._showSkeleton(normalizedPath);
 
         /* Load the real page */
-        const component = await route.component(...params);
+        try {
+          const component = await route.component(...params);
 
-        /* Fade out skeleton → show real content */
-        const skel = this.app.querySelector('.route-skeleton');
-        if (skel) {
-          skel.style.opacity = '0';
-          await new Promise(r => setTimeout(r, 180));
+          /* Fade out skeleton → show real content */
+          const skel = this.app.querySelector('.route-skeleton');
+          if (skel) {
+            skel.style.opacity = '0';
+            await new Promise(r => setTimeout(r, 180));
+          }
+
+          this.app.innerHTML = '';
+          if (typeof component === 'string') {
+            this.app.innerHTML = component;
+          } else if (component instanceof HTMLElement) {
+            component.classList.add('page-enter');
+            this.app.appendChild(component);
+          }
+
+          this.currentComponent = (component instanceof HTMLElement) ? component : null;
+          this.currentRoute = normalizedPath;
+        } catch (error) {
+          console.error('Error loading route component:', error);
+          this.app.innerHTML = `
+            <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black px-4">
+              <div class="text-center p-8 bg-white dark:bg-white/5 border border-red-200 dark:border-red-500/20 rounded-2xl shadow-xl max-w-md">
+                <h1 class="text-3xl font-black text-red-500 mb-2">Oops!</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Ocorreu um erro ao carregar esta página. Verifica a tua ligação ou tenta novamente.</p>
+                <button onclick="window.location.reload()" class="px-6 py-2.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black font-bold text-sm hover:opacity-90 transition-all">Atualizar Página</button>
+              </div>
+            </div>
+          `;
+          this.currentComponent = null;
+          this.currentRoute = normalizedPath;
         }
-
-        this.app.innerHTML = '';
-        if (typeof component === 'string') {
-          this.app.innerHTML = component;
-        } else if (component instanceof HTMLElement) {
-          component.classList.add('page-enter');
-          this.app.appendChild(component);
-        }
-
-        this.currentComponent = (component instanceof HTMLElement) ? component : null;
-        this.currentRoute = normalizedPath;
 
         // Handle anchor scrolling
         const hash = window.location.hash;

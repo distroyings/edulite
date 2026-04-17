@@ -221,6 +221,31 @@ export const chatService = {
         return { data, error };
     },
 
+    async _broadcastToChat(chatId, eventName, payloadData) {
+        if (!supabase) return;
+        try {
+            const topic = `chat-live:${chatId}`;
+            let chan = supabase.channel(topic);
+            let isSubscribed = false;
+            chan.subscribe((status) => { if (status === 'SUBSCRIBED') isSubscribed = true; });
+            
+            await new Promise(resolve => {
+                let attempt = 0;
+                const check = setInterval(() => {
+                    if (isSubscribed || attempt > 40) {
+                        clearInterval(check);
+                        resolve();
+                    }
+                    attempt++;
+                }, 50);
+            });
+
+            if (isSubscribed) {
+                chan.send({ type: 'broadcast', event: eventName, payload: payloadData });
+            }
+        } catch (e) { console.error('Chat broadcast error:', e); }
+    },
+
     async sendMessage(chatId, content, fileUrl = null, replyToId = null) {
         if (!supabase) return { error: { message: 'Supabase not configured' } };
         const user = (await supabase.auth.getUser()).data.user;
@@ -242,16 +267,9 @@ export const chatService = {
 
         // Broadcast enriched message for instant delivery
         if (data) {
-            try {
-                // 1. Broadcast to the chat channel (for ChatWindow / ClassDetailsPage)
-                supabase.channel(`chat-live:${chatId}`).send({
-                    type: 'broadcast',
-                    event: 'new_message',
-                    payload: data
-                });
-            } catch (e) { /* best-effort */ }
+            await this._broadcastToChat(chatId, 'new_message', data);
             // 2. Broadcast via RealtimeManager for sidebar updates (no REST fallback warning)
-            RealtimeManager.broadcast('messages', 'INSERT', { chat_id: chatId, content, sender_id: user.id, created_at: data.created_at });
+            await RealtimeManager.broadcast('messages', 'INSERT', { chat_id: chatId, content, sender_id: user.id, created_at: data.created_at });
         }
 
         return { data, error };
@@ -327,13 +345,7 @@ export const chatService = {
 
         // Broadcast the update for instant UI change on other clients
         if (result.data) {
-            try {
-                supabase.channel(`chat-live:${msg.chat_id}`).send({
-                    type: 'broadcast',
-                    event: 'message_updated',
-                    payload: result.data
-                });
-            } catch (e) { /* best-effort */ }
+            await this._broadcastToChat(msg.chat_id, 'message_updated', result.data);
         }
 
         return result;
@@ -365,6 +377,14 @@ export const chatService = {
             }
             return counts;
         } catch { return {}; }
+    },
+
+    async getUnreadTotalCount() {
+        if (!supabase) return 0;
+        const { data } = await this.getChats();
+        if (!data) return 0;
+        const counts = this.getUnreadCounts(data);
+        return Object.keys(counts).length;
     },
 
     /**

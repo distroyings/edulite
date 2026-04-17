@@ -708,10 +708,16 @@ export function ChatWindow(chat, { onBack } = {}) {
             const { error } = await storageService.uploadFile('chat-attachments', fName, file);
             if (error) throw error;
             const url = storageService.getPublicUrl('chat-attachments', fName);
-            const tmp = { sender_id: currentUser.id, content: file.name, file_url: url, created_at: new Date().toISOString(), profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url }, parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null };
+            const tmp = { id: 'tmp_' + Date.now(), sender_id: currentUser.id, content: file.name, file_url: url, created_at: new Date().toISOString(), profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url }, parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null };
             if (messagesArea.querySelector('.h-full')) messagesArea.innerHTML = '';
             renderMessage(tmp, true);
-            await chatService.sendMessage(chat.id, file.name, url, replyingTo?.id);
+            const { data, error: sendErr } = await chatService.sendMessage(chat.id, file.name, url, replyingTo?.id);
+            if (sendErr) throw sendErr;
+            if (data) {
+                const tmpEl = messagesArea.querySelector(`[data-msg-id="${tmp.id}"]`);
+                if (tmpEl) tmpEl.remove();
+                renderMessage(data, true);
+            }
             replyingTo = null; replyBanner.classList.add('hidden');
         } catch (e) { console.error(e); toast('Falha no envio.', true); }
         finally { textInput.placeholder = 'Mensagem...'; textInput.disabled = false; sendBtn.disabled = !textInput.value.trim(); fileInput.value = ''; }
@@ -724,11 +730,16 @@ export function ChatWindow(chat, { onBack } = {}) {
         if (!text) return;
         textInput.value = ''; sendBtn.disabled = true;
         typingIndicator.style.maxHeight = '0';
-        const tmp = { sender_id: currentUser.id, content: text, created_at: new Date().toISOString(), profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url }, parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null };
+        const tmp = { id: 'tmp_' + Date.now(), sender_id: currentUser.id, content: text, created_at: new Date().toISOString(), profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url }, parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null };
         if (messagesArea.querySelector('.h-full')) messagesArea.innerHTML = '';
         renderMessage(tmp, true);
-        const { error } = await chatService.sendMessage(chat.id, text, null, replyingTo?.id);
+        const { data, error } = await chatService.sendMessage(chat.id, text, null, replyingTo?.id);
         if (error) toast('Erro ao enviar.', true);
+        else if (data) {
+            const tmpEl = messagesArea.querySelector(`[data-msg-id="${tmp.id}"]`);
+            if (tmpEl) tmpEl.remove();
+            renderMessage(data, true);
+        }
         replyingTo = null; replyBanner.classList.add('hidden');
     };
 

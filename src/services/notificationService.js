@@ -85,11 +85,32 @@ export const notificationService = {
         // Broadcast for instant delivery
         if (data) {
             try {
-                supabase.channel(`notif-live:${userId}`).send({
-                    type: 'broadcast',
-                    event: 'new_notification',
-                    payload: data
+                const chan = supabase.channel(`notif-live:${userId}`);
+                let isSubscribed = false;
+                
+                chan.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') isSubscribed = true;
                 });
+
+                // Wait up to 2 seconds for subscription
+                await new Promise(resolve => {
+                    let attempt = 0;
+                    const check = setInterval(() => {
+                        if (isSubscribed || attempt > 40) {
+                            clearInterval(check);
+                            resolve();
+                        }
+                        attempt++;
+                    }, 50);
+                });
+
+                if (isSubscribed) {
+                    chan.send({
+                        type: 'broadcast',
+                        event: 'new_notification',
+                        payload: data
+                    });
+                }
             } catch (e) { /* best-effort */ }
         }
 
@@ -154,11 +175,19 @@ export const notificationService = {
         if (data) {
             for (const notif of data) {
                 try {
-                    supabase.channel(`notif-live:${notif.user_id}`).send({
-                        type: 'broadcast',
-                        event: 'new_notification',
-                        payload: notif
+                    const chan = supabase.channel(`notif-live:${notif.user_id}`);
+                    let isSubscribed = false;
+                    chan.subscribe((status) => { if (status === 'SUBSCRIBED') isSubscribed = true; });
+                    await new Promise(resolve => {
+                        let attempt = 0;
+                        const check = setInterval(() => {
+                            if (isSubscribed || attempt > 40) { clearInterval(check); resolve(); }
+                            attempt++;
+                        }, 50);
                     });
+                    if (isSubscribed) {
+                        chan.send({ type: 'broadcast', event: 'new_notification', payload: notif });
+                    }
                 } catch (e) { /* best-effort */ }
             }
         }

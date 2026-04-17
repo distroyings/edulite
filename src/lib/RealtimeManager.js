@@ -45,17 +45,16 @@ class RealtimeManager {
     _ensureChannel() {
         if (this.channel || !supabase) return;
 
+        this.channelStatus = 'JOINING';
         this.channel = supabase.channel('data-changes');
+        
         this.channel.on('broadcast', { event: 'change' }, ({ payload }) => {
             if (!payload) return;
             const { table, event, data } = payload;
 
             for (const [, sub] of this.subscriptions) {
-                // Match table
                 if (sub.table !== table) continue;
-                // Match event type
                 if (!sub.events.includes(event)) continue;
-                // Match filter (client-side)
                 if (sub.filter) {
                     const match = sub.filter.match(/^(.+?)=eq\.(.+)$/);
                     if (match) {
@@ -63,17 +62,32 @@ class RealtimeManager {
                         if (data && String(data[col]) !== String(val)) continue;
                     }
                 }
-                // Invoke callback
                 try { sub.callback(payload); } catch (e) { console.error('[RT] callback error:', e); }
             }
         });
 
         this.channel.subscribe((status) => {
+            this.channelStatus = status;
             if (status === 'SUBSCRIBED') {
                 console.log('[RT] ✅ Global broadcast channel connected');
             } else if (status === 'CHANNEL_ERROR') {
                 console.warn('[RT] ❌ Global channel error');
             }
+        });
+    }
+
+    async _waitForConnection() {
+        if (!this.channel) return;
+        if (this.channelStatus === 'SUBSCRIBED') return;
+        return new Promise(resolve => {
+            let attempt = 0;
+            const check = setInterval(() => {
+                if (this.channelStatus === 'SUBSCRIBED' || attempt > 40) { // Max 2 seconds timeout
+                    clearInterval(check);
+                    resolve();
+                }
+                attempt++;
+            }, 50);
         });
     }
 
@@ -101,20 +115,20 @@ class RealtimeManager {
      * @param {string} event - 'INSERT', 'UPDATE', or 'DELETE'
      * @param {object} data - The row data (should include filter fields like class_id)
      */
-    static broadcast(table, event, data = {}) {
+    static async broadcast(table, event, data = {}) {
         if (!supabase) return;
         try {
-            // Reuse the singleton's channel to avoid creating a duplicate
             const mgr = realtimeManager;
             mgr._ensureChannel();
-            if (mgr.channel) {
+            await mgr._waitForConnection();
+            if (mgr.channel && mgr.channelStatus === 'SUBSCRIBED') {
                 mgr.channel.send({
                     type: 'broadcast',
                     event: 'change',
                     payload: { table, event, data }
                 });
             }
-        } catch (e) { /* best-effort */ }
+        } catch (e) { console.error('[RT] broadcast error:', e); }
     }
 
     /** Unsubscribe a specific key */

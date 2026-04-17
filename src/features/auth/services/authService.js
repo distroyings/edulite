@@ -124,14 +124,14 @@ export const authService = {
 
     async getSession() {
         if (!supabase) return null;
-        const { data } = await supabase.auth.getSession();
-        return data.session;
+        const res = await supabase.auth.getSession();
+        return res?.data?.session || null;
     },
 
     async getUser() {
         if (!supabase) return null;
-        const { data } = await supabase.auth.getUser();
-        return data.user;
+        const res = await supabase.auth.getUser();
+        return res?.data?.user || null;
     },
 
     async createProfile(user, metadata) {
@@ -161,7 +161,8 @@ export const authService = {
     async ensureProfile() {
         if (!supabase) return;
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const res = await supabase.auth.getUser();
+            const user = res?.data?.user;
             if (!user) return;
 
             // Check if profile exists first (fast path — avoids unnecessary writes)
@@ -189,6 +190,16 @@ export const authService = {
 
             if (error && error.code !== '23505') {
                 console.error('ensureProfile: failed to create profile:', error);
+            } else if (!error) {
+                // Profile successfully created (first-time login)
+                import('../../../services/notificationService.js').then(m => {
+                    m.notificationService.createNotification(
+                        user.id, 'welcome',
+                        'Bem-vindo ao EduLite!',
+                        'A tua conta está pronta. Cria ou entra numa turma para começar a aprender.',
+                        '/classes'
+                    ).catch(() => {});
+                });
             }
         } catch (e) {
             console.error('ensureProfile error:', e);

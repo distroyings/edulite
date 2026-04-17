@@ -32,17 +32,6 @@ export async function DashboardPage() {
   const user = await authService.getUser() || { user_metadata: { name: 'Guest' } };
   const userName = user.user_metadata?.name || user.user_metadata?.username || 'utilizador';
 
-  // ─── WELCOME NOTIFICATION (first login only) ───
-  if (user.id && !localStorage.getItem(`edulite_welcomed_${user.id}`)) {
-    localStorage.setItem(`edulite_welcomed_${user.id}`, '1');
-    notificationService.createNotification(
-      user.id, 'welcome',
-      'Bem-vindo ao EduLite!',
-      'A tua conta está pronta. Cria ou entra numa turma para começar a aprender.',
-      '/classes'
-    ).catch(() => { });
-  }
-
   // ─── TOP BAR ───
   const topBar = document.createElement('div');
   topBar.className = 'flex flex-row justify-between items-center gap-3 mb-6';

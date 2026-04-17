@@ -62,7 +62,8 @@ export async function LandingPage() {
   document.body.appendChild(navbarEl);
 
   // ═══ FETCH AUTH & STATS ═══
-  const { data: { session } } = await supabase.auth.getSession();
+  const resSession = await supabase.auth.getSession();
+  const session = resSession?.data?.session;
   const isLoggedIn = !!session;
 
   let statUsers = 100, statClasses = 50;
