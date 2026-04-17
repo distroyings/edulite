@@ -39,6 +39,16 @@ export async function ChangelogPage() {
     // --- RELEASES DATA ---
     const releases = [
         {
+            date: '17 Abr 2026',
+            title: 'Correção no Registo',
+            description: 'Resolução de problemas que impossibilitavam o uso de nomes de utilizador personalizados.',
+            categories: {
+                fix: [
+                    'Correção do erro na validação do username (aparecia sempre indisponível) durante o processo de registo.'
+                ]
+            }
+        },
+        {
             date: '13 Fev 2026',
             title: 'Navegação Mobile & Estabilidade',
             description: 'Melhorias na experiência mobile e correção de conflitos de rotas.',

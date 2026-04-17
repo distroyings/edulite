@@ -47,7 +47,8 @@ export const profileService = {
 
         let query = supabase
             .from('profiles')
-            .select('id, username, name, avatar_url, bio, location, contact_email, created_at, is_verified');
+            .select('id')
+            .eq('username', cleanUsername);
 
         // Exclude the current user's own profile from the check
         if (currentUserId) {
