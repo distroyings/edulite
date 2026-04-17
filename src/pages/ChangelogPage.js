@@ -45,16 +45,20 @@ export async function ChangelogPage() {
             categories: {
                 new: [
                     'Indicador global de mensagens (Bolhinha vermelha) na navegação quando há mensagens não lidas, mesmo noutras páginas.',
-                    'Receção de notificações e sincronização no background (RealtimeManager) unificada e conectada com fiabilidade.'
+                    'Receção de notificações e sincronização no background (RealtimeManager) unificada e conectada com fiabilidade.',
+                    'Interruptor global para alternância instantânea entre Tema Claro e Tema Escuro (Dark Mode) adicionado à barra de navegação (Header).'
                 ],
                 improvement: [
+                    'Navegação "SaaS": A página das Turmas agora possui Single-Page-App real, guardando o estado de separadores anteriores sem recargas de página que interrompam a escrita.',
                     'Atualização "Optimistic UI" no chat: envio e eliminação de mensagens são instantâneos, sem esperas de carregamento da rede ou recarregamentos da página.',
                     'Transição e melhoria do envio seguro de ficheiros e anexos na conversa.'
                 ],
                 fix: [
                     'Correção de "Aviso de Boas-Vindas" spamming a surgir em múltiplos dispositivos a cada sessão.',
                     'Problemas da mensagem não sincronizada noutras instâncias ou a ficar presa se o canal não estivesse "SUBSCRIBED" foram solucionados.',
-                    'Correção do erro na validação do username (aparecia sempre indisponível) durante o processo de registo.'
+                    'Correção do erro na validação do username (aparecia sempre indisponível) durante o processo de registo.',
+                    'Resolução do Bug ao Ingressar Via Código da Turma: Os utilizadores deixaram de ser redirecionados para erros "404 - Not Found".',
+                    'Alinhamento UI da Notificação "Nova Mensagem" (Deslize Subido) para que já não bloqueie ou sobreponha o Input do Chat.'
                 ]
             }
         },

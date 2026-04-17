@@ -206,8 +206,8 @@ export async function SignupPage() {
     }
 
     if (username) {
-      const { available, error } = await profileService.checkUsernameAvailability(username);
-      if (error || !available) {
+      const { available } = await profileService.checkUsernameAvailability(username);
+      if (!available) {
         Notification.error('Este nome de utilizador já está em uso.');
         btn.disabled = false;
         btn.innerHTML = originalText;

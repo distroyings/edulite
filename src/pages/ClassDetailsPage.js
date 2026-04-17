@@ -44,7 +44,7 @@ const I = {
     leave: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>`,
 };
 
-export async function ClassDetailsPage(classId) {
+export async function ClassDetailsPage(classId, initialTab = 'stream') {
     const wrapper = document.createElement('div');
     wrapper.className = 'min-h-screen bg-background flex flex-col';
     wrapper.appendChild(await AppHeader());
@@ -184,6 +184,8 @@ export async function ClassDetailsPage(classId) {
         main.appendChild(sec);
     });
 
+    const loadedTabs = new Set();
+
     // Tab switching
     let currentTab = 'stream';
     const switchTab = (tabId) => {
@@ -200,18 +202,38 @@ export async function ClassDetailsPage(classId) {
             }
         });
 
-        if (tabId === 'stream') reloadAssignments();
-        if (tabId === 'notes') renderNotes();
-        if (tabId === 'materials') renderMaterials();
-        if (tabId === 'analytics') renderAnalytics();
-        if (tabId === 'people') renderPeople();
-        if (tabId === 'settings') renderSettings();
-        if (tabId === 'chat') renderChat();
+        // Evaluate if this is the first time we load the tab
+        const isFirstLoad = !loadedTabs.has(tabId);
+        if (isFirstLoad) {
+            loadedTabs.add(tabId);
+            if (tabId === 'stream') reloadAssignments();
+            if (tabId === 'notes') renderNotes();
+            if (tabId === 'materials') renderMaterials();
+            if (tabId === 'analytics') renderAnalytics();
+            if (tabId === 'people') renderPeople();
+            if (tabId === 'calendar') renderCalendar();
+            if (tabId === 'chat') renderChat();
+        }
+        
+        // Sync URL
+        const newPath = `/class/${classId}/${tabId}`;
+        window.history.pushState(null, '', newPath);
+        if (window.appRouter) window.appRouter.currentRoute = newPath;
     };
 
     tabDefs.forEach(tab => {
         tabs.querySelector(`#tab-${tab.id}`).onclick = () => switchTab(tab.id);
     });
+
+    // Initial active tab
+    // We defer slightly to let the UI settle before rendering heavy tabs
+    setTimeout(() => {
+        if (tabDefs.find(t => t.id === initialTab)) {
+            switchTab(initialTab);
+        } else {
+            switchTab('stream');
+        }
+    }, 0);
 
     // ═══════════════════════════════════════════════════
     //  STREAM TAB (Assignments)
@@ -272,9 +294,8 @@ export async function ClassDetailsPage(classId) {
         if (!sections['analytics']) return;
         if (!gradeBookInstance) {
             gradeBookInstance = GradeBook(classId, sections['analytics']);
-        } else {
-            gradeBookInstance.refresh();
         }
+        // Removed automatic refresh to preserve state during tab switching
     }
 
     // ═══════════════════════════════════════════════════
@@ -327,9 +348,8 @@ export async function ClassDetailsPage(classId) {
             const feedContainer = document.createElement('div');
             notesSection.appendChild(feedContainer);
             feedInstance = ClassFeed(classId, feedContainer, isOwner);
-        } else {
-            feedInstance.refresh();
         }
+        // Removed automatic refresh to prevent full reload on tab switch
     }
 
     // ═══════════════════════════════════════════════════
@@ -341,9 +361,8 @@ export async function ClassDetailsPage(classId) {
         if (!sections['materials']) return;
         if (!materialsInstance) {
             materialsInstance = ResourceLibrary(classId, sections['materials'], isOwner);
-        } else {
-            materialsInstance.refresh();
         }
+        // Removed initial automatic refresh on tab-visit
     }
 
     // ═══════════════════════════════════════════════════
@@ -1204,9 +1223,8 @@ export async function ClassDetailsPage(classId) {
     }
 
     // ═══════════════════════════════════════════════════
-    //  INITIAL LOAD
+    //  INITIAL LOAD HANDLED EARLIER VIA TIMEOUT
     // ═══════════════════════════════════════════════════
-    switchTab('stream');
 
     // ═══════════════════════════════════════════════════
     //  REAL-TIME SUBSCRIPTIONS

@@ -193,7 +193,7 @@ export function ChatWindow(chat, { onBack } = {}) {
 
     /* ═══════ NEW MESSAGE BANNER (scroll-to-bottom) ═══════ */
     const newMsgBanner = document.createElement('button');
-    newMsgBanner.className = 'absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-neon text-black text-xs font-bold shadow-xl shadow-neon/25 transition-all duration-300 hover:scale-105 active:scale-95';
+    newMsgBanner.className = 'absolute bottom-20 md:bottom-24 left-1/2 -translate-x-1/2 z-[50] flex items-center gap-2 px-4 py-2 rounded-full bg-neon text-black text-xs font-bold shadow-xl shadow-neon/25 transition-all duration-300 hover:scale-105 active:scale-95';
     newMsgBanner.style.cssText = 'opacity:0; transform: translateX(-50%) translateY(20px); pointer-events:none;';
     newMsgBanner.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg> Nova mensagem`;
     newMsgBanner.onclick = () => {

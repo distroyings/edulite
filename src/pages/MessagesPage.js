@@ -6,7 +6,7 @@ import { chatService } from '../services/chatService.js';
 import { realtimeManager } from '../lib/RealtimeManager.js';
 import { t } from '../lib/i18n.js';
 
-export async function MessagesPage() {
+export async function MessagesPage(initialChatId = null) {
     const container = document.createElement('div');
     Object.assign(container.style, {
         position: 'fixed',
@@ -102,6 +102,11 @@ export async function MessagesPage() {
             currentWindow = ChatWindow(null);
             chatContainer.appendChild(currentWindow);
             renderSidebar();
+            
+            // Sync URL
+            window.history.pushState(null, '', '/messages');
+            if (window.appRouter) window.appRouter.currentRoute = '/messages';
+            
             return;
         }
 
@@ -121,6 +126,10 @@ export async function MessagesPage() {
         currentWindow = ChatWindow(chat, { onBack: () => loadWindow(null) });
         chatContainer.appendChild(currentWindow);
         renderSidebar();
+
+        // Sync URL
+        window.history.pushState(null, '', `/messages/${chat.id}`);
+        if (window.appRouter) window.appRouter.currentRoute = `/messages/${chat.id}`;
     };
 
     /* ══════ Render Sidebar ══════ */
@@ -170,6 +179,14 @@ export async function MessagesPage() {
 
     /* ══════ Init ══════ */
     await renderSidebar();
+
+    // Check if there is an initialChatId requested in the route
+    if (initialChatId && !activeChat) {
+        const chatToOpen = chats.find(c => c.id === initialChatId);
+        if (chatToOpen) {
+            loadWindow(chatToOpen);
+        }
+    }
 
     // Live sidebar updates: when a new message arrives, update preview in-place (no full refetch)
     let sidebarRefreshTimer = null;

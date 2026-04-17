@@ -34,12 +34,15 @@ const routes = {
     '/dashboard': { component: DashboardPage, guard: true },
     '/classes': { component: ClassesPage, guard: true },
     '/class/:id': { component: ClassDetailsPage, guard: true },
+    '/class/:id/:tab': { component: ClassDetailsPage, guard: true },
     '/calendar': { component: CalendarPage, guard: true },
     '/messages': { component: MessagesPage, guard: true },
+    '/messages/:chatId': { component: MessagesPage, guard: true },
     '/settings': { component: SettingsPage, guard: true },
 };
 
 const router = new Router(routes);
+window.appRouter = router;
 
 // Route categories
 const AUTH_ONLY_ROUTES = ['/login', '/signup', '/forgot-password'];

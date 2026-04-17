@@ -225,11 +225,14 @@ export async function AppHeader() {
     });
 
     // 3. Logout
-    header.querySelector('#header-logout').onclick = async () => {
-        await authService.signOut();
-        // Force full reload to verify clean state
-        window.location.href = '/login';
-    };
+    const logoutBtn = header.querySelector('#header-logout');
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            await authService.signOut();
+            // Force full reload to verify clean state
+            window.location.href = '/login';
+        };
+    }
 
     // 4. Notification Logic — Real DB notifications
     const notifContainer = header.querySelector('#notification-container');

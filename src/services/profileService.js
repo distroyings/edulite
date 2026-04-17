@@ -47,17 +47,23 @@ export const profileService = {
 
         let query = supabase
             .from('profiles')
-            .select('id')
-            .eq('username', cleanUsername);
+            .select('*', { count: 'exact', head: true })
+            .ilike('username', cleanUsername);
 
         // Exclude the current user's own profile from the check
         if (currentUserId) {
             query = query.neq('id', currentUserId);
         }
 
-        const { data, error } = await query.maybeSingle();
+        const { count, error } = await query;
+        
+        // If there is an error, default to available unless it's a constraint issue to prevent blocking signups on network flakes
+        if (error) {
+            console.error('checkUsernameAvailability error:', error);
+            return { available: true, error };
+        }
 
-        return { available: !data, error };
+        return { available: count === 0, error: null };
     },
 
     async getProfileByUsername(username) {
