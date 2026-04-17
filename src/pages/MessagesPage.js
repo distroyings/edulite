@@ -87,6 +87,8 @@ export async function MessagesPage(initialChatId = null) {
     window.addEventListener('resize', onResize);
 
     /* ══════ Load Chat Window ══════ */
+    let navHideTimer = null; // Track deferred nav-hide to cancel it if needed
+
     const loadWindow = (chat) => {
         if (currentWindow?.cleanup) currentWindow.cleanup();
         chatContainer.innerHTML = '';
@@ -99,7 +101,8 @@ export async function MessagesPage(initialChatId = null) {
                 chatContainer.style.display = 'none';
                 sidebarContainer.style.display = 'flex';
             }
-            // Always restore mobile bottom nav when closing a chat
+            // Cancel any pending nav-hide timer & restore nav
+            clearTimeout(navHideTimer);
             if (mobileBottomNav) mobileBottomNav.style.display = '';
 
             currentWindow = ChatWindow(null);
@@ -117,10 +120,10 @@ export async function MessagesPage(initialChatId = null) {
         if (isMobile) {
             sidebarContainer.style.display = 'none';
             chatContainer.style.display = 'flex';
-            const mobileBottomNav = document.getElementById('mobile-bottom-nav');
             if (mobileBottomNav) mobileBottomNav.style.display = 'none';
             // Deferred hide in case the nav isn't in DOM yet (page transition)
-            setTimeout(() => {
+            clearTimeout(navHideTimer);
+            navHideTimer = setTimeout(() => {
                 const nav = document.getElementById('mobile-bottom-nav');
                 if (nav) nav.style.display = 'none';
             }, 100);
@@ -234,46 +237,49 @@ export async function MessagesPage(initialChatId = null) {
         }, 300);
     });
 
-    const autoOpenId = localStorage.getItem('open_chat_id');
-    if (autoOpenId) {
-        localStorage.removeItem('open_chat_id');
-        let target = chats.find(c => c.id === autoOpenId);
+    // Only check localStorage auto-open if no chat was already opened by deep link
+    if (!activeChat) {
+        const autoOpenId = localStorage.getItem('open_chat_id');
+        if (autoOpenId) {
+            localStorage.removeItem('open_chat_id');
+            let target = chats.find(c => c.id === autoOpenId);
 
-        // If chat not in sidebar (e.g. new empty DM), build it from DB
-        if (!target) {
-            try {
-                const { supabase } = await import('../lib/supabase.js');
-                const { authService } = await import('../features/auth/services/authService.js');
-                const me = await authService.getUser();
-                if (supabase && me) {
-                    const { data: others } = await supabase
-                        .from('chat_members')
-                        .select('user_id, profiles(id, name, avatar_url, username, is_verified)')
-                        .eq('chat_id', autoOpenId)
-                        .neq('user_id', me.id)
-                        .limit(1);
-                    const other = others?.[0]?.profiles;
-                    target = {
-                        id: autoOpenId,
-                        type: 'direct',
-                        name: other?.name || other?.username || 'Utilizador',
-                        avatar: other?.avatar_url || null,
-                        otherProfile: other || null,
-                        otherUserId: other?.id || null,
-                        is_verified: other?.is_verified || false
-                    };
-                }
-            } catch { /* fallback: open without name */ }
+            // If chat not in sidebar (e.g. new empty DM), build it from DB
+            if (!target) {
+                try {
+                    const { supabase } = await import('../lib/supabase.js');
+                    const { authService } = await import('../features/auth/services/authService.js');
+                    const me = await authService.getUser();
+                    if (supabase && me) {
+                        const { data: others } = await supabase
+                            .from('chat_members')
+                            .select('user_id, profiles(id, name, avatar_url, username, is_verified)')
+                            .eq('chat_id', autoOpenId)
+                            .neq('user_id', me.id)
+                            .limit(1);
+                        const other = others?.[0]?.profiles;
+                        target = {
+                            id: autoOpenId,
+                            type: 'direct',
+                            name: other?.name || other?.username || 'Utilizador',
+                            avatar: other?.avatar_url || null,
+                            otherProfile: other || null,
+                            otherUserId: other?.id || null,
+                            is_verified: other?.is_verified || false
+                        };
+                    }
+                } catch { /* fallback: open without name */ }
+            }
+            loadWindow(target || null);
         }
-        loadWindow(target || null);
-    } else {
-        loadWindow(null);
+        // If no autoOpenId and no initialChatId, just show the sidebar (already showing)
     }
 
     container.cleanup = () => {
         window.removeEventListener('resize', onResize);
         if (currentWindow?.cleanup) currentWindow.cleanup();
         clearTimeout(sidebarRefreshTimer);
+        clearTimeout(navHideTimer);
         realtimeManager.unsubscribe('sidebar:messages');
         // Restore mobile bottom nav when leaving Messages page
         const mobileBottomNav = document.getElementById('mobile-bottom-nav');
