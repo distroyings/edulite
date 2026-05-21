@@ -34,7 +34,7 @@ export const profileService = {
     },
 
     async checkUsernameAvailability(username, currentUserId = null) {
-        if (!supabase || !username) return { data: false, error: null };
+        if (!supabase || !username) return { available: false, error: null };
 
         // Strip @ if present for checking
         const cleanUsername = username.startsWith('@') ? username.substring(1) : username;

@@ -66,12 +66,12 @@ export async function SettingsPage() {
                 <div class="relative transition-transform duration-200 focus-within:scale-[1.01]">
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-muted font-medium text-sm group-focus-within:text-neon transition-colors">${opts.prefix}</span>
                     <input type="${type}" name="${name}" value="${value}" ${opts.placeholder ? `placeholder="${opts.placeholder}"` : ''} ${mlAttr}
-                        class="settings-input w-full bg-gray-50/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl pl-9 pr-5 py-3.5 text-sm font-medium text-primary placeholder:text-muted/40 focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-all shadow-sm group-hover:border-gray-300 dark:group-hover:border-white/20">
+                        class="settings-input w-full bg-gray-50/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl pl-9 pr-5 py-3.5 text-sm font-medium text-primary placeholder:text-muted/40 focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-colors shadow-sm group-hover:border-gray-300 dark:group-hover:border-white/20">
                 </div>
             ` : `
                 <div class="relative transition-transform duration-200 focus-within:scale-[1.01]">
                     <input type="${type}" name="${name}" value="${value}" ${opts.placeholder ? `placeholder="${opts.placeholder}"` : ''} ${mlAttr}
-                        class="settings-input w-full bg-gray-50/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-3.5 text-sm font-medium text-primary placeholder:text-muted/40 focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-all shadow-sm group-hover:border-gray-300 dark:group-hover:border-white/20">
+                        class="settings-input w-full bg-gray-50/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-3.5 text-sm font-medium text-primary placeholder:text-muted/40 focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-colors shadow-sm group-hover:border-gray-300 dark:group-hover:border-white/20">
                 </div>
             `}
         </div>
@@ -168,7 +168,7 @@ export async function SettingsPage() {
                     <label class="block text-[11px] font-bold text-muted/80 uppercase tracking-widest mb-2">${t('settings.bio')}</label>
                     <div class="relative group">
                         <textarea name="bio" rows="3" maxlength="200" placeholder="Conta-nos um pouco sobre ti..."
-                            class="settings-input w-full bg-gray-50/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 text-sm font-medium text-primary placeholder:text-muted/40 focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-all resize-none leading-relaxed shadow-sm"></textarea>
+                            class="settings-input w-full bg-gray-50/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 text-sm font-medium text-primary placeholder:text-muted/40 focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-colors resize-none leading-relaxed shadow-sm"></textarea>
                         <div class="absolute bottom-3 right-4 text-[10px] font-bold text-muted/50 pointer-events-none tabular-nums">
                             <span id="bio-count">${(profile?.bio || '').length}</span>/200
                         </div>
@@ -703,16 +703,22 @@ export async function SettingsPage() {
             onConfirm: async () => {
                 try {
                     Notification.info('A eliminar conta... isto pode demorar.');
-                    const { ADMIN_API_URL } = await import('../config.js');
+                    const { FUNCTIONS_URL, SUPABASE_ANON_KEY } = await import('../config.js');
                     const { data: sessionData } = await supabase.auth.getSession();
                     const token = sessionData?.session?.access_token;
                     if (!token) {
                         Notification.error('Sessão expirada. Faz login novamente.');
                         return;
                     }
-                    const res = await fetch(`${ADMIN_API_URL}/api/account`, {
+                    // delete-account edge function: verifies JWT, then
+                    // uses the service role to remove auth.users — which
+                    // CASCADEs through every public table the user owns.
+                    const res = await fetch(`${FUNCTIONS_URL}/delete-account`, {
                         method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${token}` },
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'apikey': SUPABASE_ANON_KEY,
+                        },
                     });
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}));
@@ -723,7 +729,8 @@ export async function SettingsPage() {
                     Notification.success('Conta eliminada com sucesso.');
                     window.location.href = '/';
                 } catch (e) {
-                    Notification.error('Servidor offline. Tenta mais tarde.');
+                    console.error('Delete account error:', e);
+                    Notification.error('Falha ao contactar o servidor. Tenta mais tarde.');
                 }
             }
         });

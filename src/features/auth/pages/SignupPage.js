@@ -35,7 +35,7 @@ export async function SignupPage() {
         <div>
             <label class="block text-sm font-medium text-muted mb-1">${t('auth.fullName')}</label>
             <input type="text" id="name" required maxlength="50"
-            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
             placeholder="João Silva">
         </div>
         
@@ -50,7 +50,7 @@ export async function SignupPage() {
                     </div>
                 </div>
                 <input type="text" id="username" maxlength="20"
-                class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-10 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+                class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-10 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
                 placeholder="utilizador">
                 <div id="username-status" class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold transition-all"></div>
             </div>
@@ -60,7 +60,7 @@ export async function SignupPage() {
         <div>
             <label class="block text-sm font-medium text-muted mb-1">${t('auth.email')}</label>
             <input type="email" id="email" required maxlength="100"
-            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
             placeholder="exemplo@escola.pt">
         </div>
         
@@ -68,7 +68,7 @@ export async function SignupPage() {
             <label class="block text-sm font-medium text-muted mb-1">${t('auth.password')}</label>
             <div class="relative group">
                 <input type="password" id="password" required minlength="6" maxlength="72"
-                class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+                class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
                 placeholder="••••••••">
                 <button type="button" id="toggle-password" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-neon transition-all p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5">
                     <svg id="eye-icon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,9 +106,9 @@ export async function SignupPage() {
 
     <!-- STEP 2: OTP FORM (Hidden by default) -->
     <div id="step-otp" class="hidden">
-        <div class="text-center mb-8">
-            <div class="w-16 h-16 bg-neon/10 text-neon rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+        <div class="text-center mb-8 animate-tg-pop">
+            <div class="w-16 h-16 bg-neon/10 text-neon rounded-2xl flex items-center justify-center mx-auto mb-4 ring-1 ring-neon/20 shadow-lg shadow-neon/10">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
             </div>
             <h2 class="text-3xl font-bold mb-2 text-primary">Verifica o E-mail</h2>
             <p class="text-muted">Enviámos um código para <br><span id="otp-email-display" class="text-neon font-bold"></span></p>
@@ -117,10 +117,10 @@ export async function SignupPage() {
         <div class="space-y-8">
             <div class="space-y-4">
                  <div class="relative group">
-                    <input type="text" id="otp-input" 
+                    <input type="text" id="otp-input"
                         class="w-full bg-surface border-2 border-border focus:border-neon rounded-xl px-4 py-4 text-center text-3xl font-bold tracking-[0.5em] text-primary focus:outline-none transition-all placeholder-muted/20"
-                        placeholder="000000" maxlength="10" autocomplete="one-time-code">
-                    <p class="text-xs text-center text-muted mt-2">Cola o código aqui (suporta 6-8 dígitos)</p>
+                        placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                    <p class="text-xs text-center text-muted mt-2">Código de 6 dígitos</p>
                 </div>
             </div>
 

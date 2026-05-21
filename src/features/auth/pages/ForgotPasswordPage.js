@@ -35,7 +35,7 @@ export async function ForgotPasswordPage() {
                     <div class="relative group">
                         <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted group-focus-within:text-neon transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         <input type="email" id="email" required
-                            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg pl-12 pr-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+                            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg pl-12 pr-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
                             placeholder="nome@escola.pt">
                     </div>
                 </div>
@@ -52,9 +52,9 @@ export async function ForgotPasswordPage() {
 
         <!-- STEP 2: OTP -->
         <div id="step-otp" class="hidden">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-neon/10 text-neon rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11.542 17H12a2 2 0 012 2v2a2 2 0 01-2 2H9a2 2 0 01-2-2v-2a2 2 0 012-2h.458l-6.495-6.495A2 2 0 012.8 10.31M15 7a2 2 0 00-2 2m2-2v6m2-6a6 6 0 00-6-6"></path></svg>
+            <div class="text-center mb-8 animate-tg-pop">
+                <div class="w-16 h-16 bg-neon/10 text-neon rounded-2xl flex items-center justify-center mx-auto mb-4 ring-1 ring-neon/20 shadow-lg shadow-neon/10">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
                 </div>
                 <h2 class="text-3xl font-bold mb-2 text-primary">Verificar Código</h2>
                 <p class="text-muted">Enviámos um código para <br><span id="otp-email-display" class="text-neon font-bold"></span></p>
@@ -65,8 +65,8 @@ export async function ForgotPasswordPage() {
                     <div class="relative group">
                         <input type="text" id="otp-input"
                             class="w-full bg-surface border-2 border-border focus:border-neon rounded-xl px-4 py-4 text-center text-3xl font-bold tracking-[0.5em] text-primary focus:outline-none transition-all placeholder-muted/20"
-                            placeholder="000000" maxlength="10" autocomplete="one-time-code">
-                        <p class="text-xs text-center text-muted mt-2">Cola o código aqui (suporta 6-8 dígitos)</p>
+                            placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                        <p class="text-xs text-center text-muted mt-2">Código de 6 dígitos</p>
                     </div>
                 </div>
 
@@ -85,7 +85,7 @@ export async function ForgotPasswordPage() {
                     <label class="block text-sm font-medium text-muted mb-1">Nova Palavra-passe</label>
                     <div class="relative group">
                         <input type="password" id="new-password" required minlength="6"
-                            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+                            class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
                             placeholder="••••••••">
                     </div>
                 </div>
@@ -134,7 +134,7 @@ export async function ForgotPasswordPage() {
         }
     };
 
-    // --- STEP 2: OTP Logic (Single input, supports 6-8 digit codes) ---
+    // --- STEP 2: OTP Logic (6-digit numeric code) ---
     const otpInput = card.querySelector('#otp-input');
     otpInput.addEventListener('input', (e) => {
         e.target.value = e.target.value.replace(/[^0-9]/g, '');

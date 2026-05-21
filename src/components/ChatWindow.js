@@ -4,6 +4,9 @@ import { storageService } from '../services/storageService.js';
 import { profileService } from '../services/profileService.js';
 import { t } from '../lib/i18n.js';
 import { verifiedBadge } from '../lib/badges.js';
+import { escapeHtml } from '../lib/utils.js';
+import { getAvatarGradient } from '../lib/avatar.js';
+import { Notification } from '../lib/Notification.js';
 
 import { ConfirmModal } from '../lib/ConfirmModal.js';
 
@@ -24,15 +27,41 @@ const I = {
     wave: `<svg class="w-5 h-5 inline-block align-[-3px]" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 11.5V14m0-2.5v-3a1.5 1.5 0 013 0m-3 3a1.5 1.5 0 013 0m0 0V14m0-5.5v4m0-4a1.5 1.5 0 013 0m0 0V14m0-6a1.5 1.5 0 013 0v3.5a5.5 5.5 0 01-11 0V9.5a1.5 1.5 0 013 0"/></svg>`,
 };
 
-const QUICK_EMOJIS = ['❤️', '😂', '😮', '😢', '🎉', '👍', '🔥', '👏'];
+const QUICK_EMOJIS = [
+    '❤️', '😂', '🥰', '😍', '😎', '🤔', '😮', '😢',
+    '🎉', '🥳', '👍', '👎', '🔥', '👏', '🙏', '💯',
+    '✨', '🤣', '😅', '🤩', '💪', '✅', '🤝', '👌'
+];
+
+// Chat attachments bucket (see create_all.sql): 10 MB cap + a restricted
+// MIME whitelist. We mirror it client-side so the user gets instant
+// feedback instead of waiting for the upload to fail at the storage layer.
+const CHAT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const CHAT_ALLOWED_MIME = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+    'application/pdf', 'text/plain', 'application/zip',
+    'audio/mpeg', 'audio/wav', 'audio/ogg',
+    'video/mp4', 'video/webm',
+]);
+
+const validateChatFile = (file) => {
+    if (file.size > CHAT_MAX_FILE_SIZE) {
+        return { ok: false, reason: `Ficheiro demasiado grande (máx. 10 MB).` };
+    }
+    if (file.type && !CHAT_ALLOWED_MIME.has(file.type)) {
+        return { ok: false, reason: `Tipo de ficheiro não suportado.` };
+    }
+    return { ok: true };
+};
 
 export function ChatWindow(chat, { onBack } = {}) {
     const container = document.createElement('div');
-    container.className = 'flex flex-col h-full w-full bg-background overflow-hidden';
+    container.className = 'flex flex-col h-full w-full overflow-hidden relative tg-chat-bg';
 
     /* ═══════ EMPTY STATE — Animated Stacked Cards ═══════ */
     if (!chat) {
         container.className += ' items-center justify-center';
+
         const isDark = document.documentElement.classList.contains('dark');
 
         const features = [
@@ -44,14 +73,14 @@ export function ChatWindow(chat, { onBack } = {}) {
         ];
 
         const frame = document.createElement('div');
+        frame.className = 'relative z-10 animate-tg-pop';
         frame.style.cssText = `
-            width: 520px; max-width: 90vw; padding: 24px; border-radius: 32px;
-            background: ${isDark
-                ? 'linear-gradient(145deg, #1a1a2e, #16213e)'
-                : 'linear-gradient(145deg, #c8cdd6, #d5dae3)'};
-            box-shadow: ${isDark
-                ? '0 30px 70px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06) inset'
-                : '0 30px 70px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.5) inset'};
+            width: 520px; max-width: 90vw; padding: 24px; border-radius: 24px;
+            background: ${isDark ? 'rgba(23,33,43,0.7)' : 'rgba(255,255,255,0.85)'};
+            backdrop-filter: blur(20px) saturate(1.6);
+            -webkit-backdrop-filter: blur(20px) saturate(1.6);
+            border: 1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'};
+            box-shadow: 0 24px 48px -12px rgba(0,0,0,${isDark ? '0.5' : '0.12'});
         `;
 
         const frameInner = document.createElement('div');
@@ -60,28 +89,29 @@ export function ChatWindow(chat, { onBack } = {}) {
         const stackArea = document.createElement('div');
         stackArea.style.cssText = 'position:relative; width:100%; height:280px; flex:1; min-width:0;';
 
-        const cardBg = isDark ? 'rgba(26,28,46,0.98)' : 'rgba(255,255,255,0.97)';
-        const cardBorder = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
         const titleColor = isDark ? '#e4e6f0' : '#1a1a2e';
-        const descColor = isDark ? '#7b7f96' : '#6b7085';
+        const descColor = isDark ? '#9ca3b7' : '#6b7085';
+        // Cards must be opaque so the lower stack members don't bleed through
+        // the top one. Translucency only on the OUTER frame (above).
+        const cardBg = isDark ? 'rgb(20, 28, 40)' : 'rgb(255, 255, 255)';
 
         const cards = features.map((f) => {
             const card = document.createElement('div');
             card.style.cssText = `
                 position:absolute; left:0; right:0; top:0; height:100%;
-                border-radius: 20px; padding: 36px 28px;
-                display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px;
+                border-radius: 20px; padding: 32px 24px;
+                display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
                 text-align:center;
-                background: ${cardBg}; border: 1px solid ${cardBorder};
-                box-shadow: ${isDark ? '0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset' : '0 8px 32px rgba(0,0,0,0.1)'};
-                transition: all 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+                background: ${cardBg};
+                border: 1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'};
+                transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
                 will-change: transform, opacity;
             `;
             card.innerHTML = `
-                <div class="w-20 h-20 rounded-2xl bg-gradient-to-br ${f.color} flex items-center justify-center text-white" style="box-shadow: 0 10px 28px rgba(0,0,0,0.2)">${f.icon}</div>
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br ${f.color} flex items-center justify-center text-white" style="box-shadow: 0 8px 20px -4px rgba(0,0,0,0.25)">${f.icon}</div>
                 <div>
-                    <h3 style="font-size:17px; font-weight:700; color:${titleColor}; margin-bottom:6px; letter-spacing:-0.01em">${f.title}</h3>
-                    <p style="font-size:13.5px; color:${descColor}; line-height:1.55; max-width:260px; margin:0 auto">${f.desc}</p>
+                    <h3 style="font-size:17px; font-weight:700; color:${titleColor}; margin-bottom:6px; letter-spacing:-0.015em">${f.title}</h3>
+                    <p style="font-size:13.5px; color:${descColor}; line-height:1.55; max-width:280px; margin:0 auto">${f.desc}</p>
                 </div>
             `;
             stackArea.appendChild(card);
@@ -138,36 +168,45 @@ export function ChatWindow(chat, { onBack } = {}) {
 
     /* ═══════ HEADER ═══════ */
     const letter = (chat.name || 'C')[0].toUpperCase();
-    const gradients = [
-        'from-rose-500 to-pink-600', 'from-orange-500 to-amber-600', 'from-amber-400 to-yellow-500',
-        'from-emerald-500 to-green-600', 'from-cyan-400 to-teal-500', 'from-blue-500 to-indigo-600',
-        'from-violet-500 to-purple-600', 'from-pink-500 to-rose-600', 'from-teal-400 to-cyan-500',
-    ];
-    const avatarGradient = gradients[letter.charCodeAt(0) % gradients.length];
+    const avatarGradient = getAvatarGradient(chat.name || 'C');
     const isClickable = chat.type === 'direct' || chat.type === 'class';
     const badgeHtml = chat.is_verified ? verifiedBadge(true, 'md') : '';
 
+    /* ═══════ HEADER — floating pill at the top ═══════ */
+    // Wrapper is absolute so messages scroll under it; pointer-events-none
+    // lets the empty padding around the pill pass clicks through to the
+    // messages, the pill itself stays interactive.
+    const headerWrapper = document.createElement('div');
+    headerWrapper.className = 'absolute top-0 left-0 right-0 px-3 md:px-6 pt-3 z-20 pointer-events-none';
+
+    const headerColumn = document.createElement('div');
+    headerColumn.className = 'max-w-3xl mx-auto pointer-events-auto';
+    headerWrapper.appendChild(headerColumn);
+
     const header = document.createElement('div');
-    header.className = 'flex items-center gap-3 px-4 md:px-6 py-3 border-b border-gray-200/80 dark:border-white/[0.06] bg-white/80 dark:bg-surface/80 backdrop-blur-xl flex-shrink-0 z-10';
+    header.className = 'flex items-center gap-3 rounded-2xl crisp-glass shadow-lg shadow-black/5 px-3 py-2';
     header.innerHTML = `
-        ${onBack ? `<button id="chat-back-btn" class="p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 hover:text-primary transition-all active:scale-90 md:hidden">${I.back}</button>` : ''}
-        <div id="chat-header-profile" class="flex items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}">
+        ${onBack ? `<button id="chat-back-btn" aria-label="Voltar" class="p-2 -ml-1 rounded-full hover:bg-black/5 dark:hover:bg-white/[0.06] text-muted hover:text-primary transition-colors active:scale-95 md:hidden">${I.back}</button>` : ''}
+        <div id="chat-header-profile" class="flex items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer group/profile transition-opacity hover:opacity-85' : ''}">
             <div class="flex-shrink-0 relative">
                 ${chat.avatar
-            ? `<img src="${chat.avatar}" class="w-10 h-10 rounded-xl object-cover ring-2 ring-black/5 dark:ring-white/10 shadow-sm">`
-            : `<div class="w-10 h-10 rounded-xl bg-gradient-to-br ${avatarGradient} text-white flex items-center justify-center font-bold text-base shadow-sm">${letter}</div>`
+            ? `<img src="${chat.avatar}" alt="" class="w-10 h-10 rounded-full object-cover">`
+            : `<div class="w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient} text-white flex items-center justify-center font-bold text-base">${letter}</div>`
         }
-                ${chat.type === 'class' ? `<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-gradient-to-br from-neon to-blue-500 flex items-center justify-center ring-2 ring-white dark:ring-surface"><svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"></path></svg></div>` : ''}
+                ${chat.type === 'class' ? `<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-neon flex items-center justify-center ring-2 ring-surface"><svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/></svg></div>` : ''}
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="font-bold text-sm text-primary leading-tight flex items-center gap-1.5"><span class="truncate">${chat.name}</span>${badgeHtml}</h3>
-                <p class="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5">
-                    ${chat.type === 'class' ? '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"></path></svg> Chat da turma' : 'Chat privado'}
+                <h3 class="font-semibold text-[14.5px] text-primary leading-tight flex items-center gap-1.5"><span class="truncate">${chat.name}</span>${badgeHtml}</h3>
+                <p class="text-[11.5px] text-muted mt-0.5 flex items-center gap-1.5">
+                    ${chat.type === 'class'
+            ? '<svg class="w-3 h-3 text-neon" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/></svg> Chat da turma'
+            : '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> online'}
                 </p>
             </div>
         </div>
     `;
-    container.appendChild(header);
+    headerColumn.appendChild(header);
+    container.appendChild(headerWrapper);
     if (onBack) header.querySelector('#chat-back-btn')?.addEventListener('click', onBack);
 
     if (isClickable) {
@@ -185,23 +224,34 @@ export function ChatWindow(chat, { onBack } = {}) {
         });
     }
 
-    /* ═══════ MESSAGES AREA ═══════ */
+    /* ═══════ MESSAGES AREA — Telegram-style decorative bg via tg-chat-bg ═══════ */
+    const messagesAreaWrap = document.createElement('div');
+    messagesAreaWrap.className = 'relative flex-1 overflow-hidden';
+
     const messagesArea = document.createElement('div');
-    messagesArea.className = 'flex-1 overflow-y-auto px-3 md:px-14 lg:px-24 py-4 space-y-0.5 relative';
-    messagesArea.style.cssText = 'scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.08) transparent;';
-    container.appendChild(messagesArea);
+    // The outer scroller is full-width so the scroll position can latch to
+    // the actual edges. The inner column constrains the message content
+    // to a comfortable reading width, matching the floating input pill.
+    messagesArea.className = 'absolute inset-0 overflow-y-auto no-scrollbar';
+    const messagesInner = document.createElement('div');
+    // pt-20 clears the floating header pill; pb-24 leaves room for the
+    // floating input pill at the bottom. min-h-full lets the empty-state
+    // hero (h-full) center vertically inside the visible area.
+    messagesInner.className = 'max-w-3xl mx-auto px-3 md:px-4 pt-20 pb-24 space-y-0.5 min-h-full';
+    messagesArea.appendChild(messagesInner);
+    messagesAreaWrap.appendChild(messagesArea);
+    container.appendChild(messagesAreaWrap);
 
     /* ═══════ NEW MESSAGE BANNER (scroll-to-bottom) ═══════ */
     const newMsgBanner = document.createElement('button');
-    newMsgBanner.className = 'absolute bottom-20 md:bottom-24 left-1/2 -translate-x-1/2 z-[50] flex items-center gap-2 px-4 py-2 rounded-full bg-neon text-black text-xs font-bold shadow-xl shadow-neon/25 transition-all duration-300 hover:scale-105 active:scale-95';
+    newMsgBanner.className = 'absolute bottom-24 md:bottom-28 left-1/2 -translate-x-1/2 z-[50] flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-br from-neon to-blue-500 text-white text-xs font-black shadow-xl shadow-neon/40 transition-all duration-300 hover:scale-105 active:scale-95 ring-1 ring-white/10';
     newMsgBanner.style.cssText = 'opacity:0; transform: translateX(-50%) translateY(20px); pointer-events:none;';
     newMsgBanner.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg> Nova mensagem`;
     newMsgBanner.onclick = () => {
         messagesArea.scrollTo({ top: messagesArea.scrollHeight, behavior: 'smooth' });
         hideNewMsgBanner();
     };
-    messagesArea.parentElement.style.position = 'relative';
-    container.insertBefore(newMsgBanner, messagesArea.nextSibling);
+    container.appendChild(newMsgBanner);
 
     const showNewMsgBanner = () => {
         newMsgBanner.style.opacity = '1';
@@ -220,79 +270,68 @@ export function ChatWindow(chat, { onBack } = {}) {
         if (isScrolledNearBottom()) hideNewMsgBanner();
     });
 
-    /* ═══════ TYPING INDICATOR (multi-user) ═══════ */
-    const typingIndicator = document.createElement('div');
-    typingIndicator.className = 'px-4 md:px-14 lg:px-24 py-0 overflow-hidden transition-all duration-300';
-    typingIndicator.style.maxHeight = '0';
-    typingIndicator.innerHTML = `
-        <div class="flex items-center gap-2 py-1.5">
-            <div class="flex gap-0.5">
-                <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>
-                <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>
-                <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></span>
-            </div>
-            <span id="typing-name" class="text-xs text-muted font-medium"></span>
-        </div>
-    `;
-    container.appendChild(typingIndicator);
-    const typingUsers = new Map(); // userId -> { name, timer }
-    const updateTypingDisplay = () => {
-        const names = [...typingUsers.values()].map(v => v.name);
-        const nameEl = typingIndicator.querySelector('#typing-name');
-        if (names.length === 0) {
-            typingIndicator.style.maxHeight = '0';
-            return;
-        }
-        typingIndicator.style.maxHeight = '32px';
-        if (names.length === 1) nameEl.textContent = `${names[0]} está a escrever...`;
-        else if (names.length === 2) nameEl.textContent = `${names[0]} e ${names[1]} estão a escrever...`;
-        else nameEl.textContent = `${names.length} pessoas estão a escrever...`;
-    };
 
-    /* ═══════ INPUT AREA ═══════ */
+    /* ═══════ INPUT AREA — floating pill, overlays the message scroll ═══════ */
+    // `absolute bottom-0` means it doesn't take vertical space from the flex
+    // layout, so messages scroll behind it and the chat-bg pattern extends
+    // edge-to-edge. `pointer-events-none` on the wrapper lets clicks on
+    // empty side-padding fall through to the messages underneath; the pill
+    // itself re-enables pointer events.
     const inputWrapper = document.createElement('div');
-    inputWrapper.className = 'flex-shrink-0 border-t border-gray-200/80 dark:border-white/[0.06] bg-white/80 dark:bg-surface/80 backdrop-blur-xl';
+    inputWrapper.className = 'absolute bottom-0 left-0 right-0 px-3 md:px-6 pb-3 z-10 pointer-events-none';
 
-    // Reply banner
+    // Inner centered column so on wide screens the pill doesn't stretch
+    // across the whole window. `pointer-events-auto` re-enables clicks
+    // for the floating banners and the message pill itself.
+    const inputColumn = document.createElement('div');
+    inputColumn.className = 'max-w-3xl mx-auto space-y-2 pointer-events-auto';
+    inputWrapper.appendChild(inputColumn);
+
+    // Reply banner — floating glass pill with neon accent rail.
     const replyBanner = document.createElement('div');
-    replyBanner.className = 'px-4 md:px-14 lg:px-24 py-2.5 bg-gradient-to-r from-neon/[0.06] to-transparent border-b border-neon/10 hidden';
+    replyBanner.className = 'rounded-2xl crisp-glass px-3 py-2 hidden';
     replyBanner.innerHTML = `
         <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5 text-sm min-w-0">
-                <div class="w-1 h-9 bg-gradient-to-b from-neon to-blue-500 rounded-full flex-shrink-0"></div>
+            <div class="flex items-center gap-3 text-sm min-w-0">
+                <div class="w-1 h-9 bg-neon rounded-full flex-shrink-0"></div>
                 <div class="min-w-0">
-                    <span class="text-neon text-[11px] font-bold block">A responder</span>
-                    <span id="reply-to-text" class="text-gray-500 text-xs truncate block max-w-[300px]">…</span>
+                    <span class="text-neon text-[12px] font-semibold block">A responder</span>
+                    <span id="reply-to-text" class="text-muted text-[12px] truncate block max-w-[300px] mt-0.5">…</span>
                 </div>
             </div>
-            <button id="cancel-reply" class="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-90">${I.close}</button>
+            <button id="cancel-reply" aria-label="Cancelar resposta" class="w-7 h-7 rounded-full text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors active:scale-90 flex items-center justify-center">${I.close}</button>
         </div>
     `;
-    inputWrapper.appendChild(replyBanner);
+    inputColumn.appendChild(replyBanner);
 
-    // Quick emoji bar (hidden by default, toggleable)
+    // Pending attachment preview — floating pill.
+    const pendingFileBanner = document.createElement('div');
+    pendingFileBanner.className = 'rounded-2xl crisp-glass px-3 py-2.5 hidden';
+    inputColumn.appendChild(pendingFileBanner);
+
+    // Quick reactions — floating pill, only visible when toggled.
     const emojiBar = document.createElement('div');
-    emojiBar.className = 'px-4 md:px-14 lg:px-24 py-2 border-b border-gray-100 dark:border-white/[0.04] hidden';
+    emojiBar.className = 'rounded-full crisp-glass px-2 py-1 hidden';
     emojiBar.innerHTML = `
-        <div class="flex items-center gap-1 overflow-x-auto">
-            ${QUICK_EMOJIS.map(e => `<button type="button" class="emoji-quick px-2.5 py-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.06] text-lg transition-all hover:scale-110 active:scale-90 flex-shrink-0">${e}</button>`).join('')}
+        <div class="flex items-center gap-0.5 overflow-x-auto no-scrollbar">
+            ${QUICK_EMOJIS.map(e => `<button type="button" class="emoji-quick w-9 h-9 rounded-full hover:bg-black/5 dark:hover:bg-white/[0.06] text-xl transition-transform hover:scale-125 active:scale-90 flex-shrink-0 flex items-center justify-center">${e}</button>`).join('')}
         </div>
     `;
-    inputWrapper.appendChild(emojiBar);
+    inputColumn.appendChild(emojiBar);
 
+    // Main message pill — single floating capsule containing attach, emoji,
+    // input and send. No top border, no full-width strip.
     const inputArea = document.createElement('form');
-    inputArea.className = 'flex items-end gap-1.5 px-3 md:px-14 lg:px-24 py-3';
+    inputArea.className = 'flex items-center gap-1 rounded-full crisp-glass shadow-lg shadow-black/5 pl-1.5 pr-1.5 py-1.5';
     inputArea.innerHTML = `
         <input type="file" id="chat-file-input" class="hidden">
-        <button type="button" id="chat-upload-btn" class="p-2.5 rounded-xl text-gray-400 hover:text-neon hover:bg-neon/[0.06] transition-all active:scale-90 flex-shrink-0" title="Anexar ficheiro">${I.attach}</button>
-        <button type="button" id="emoji-toggle-btn" class="p-2.5 rounded-xl text-gray-400 hover:text-amber-500 hover:bg-amber-500/[0.06] transition-all active:scale-90 flex-shrink-0" title="Emojis">${I.emoji}</button>
-        <div class="flex-1 relative">
-            <input type="text" id="chat-text-input" placeholder="Mensagem..." 
-                   class="w-full py-2.5 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/20 text-primary placeholder:text-gray-400 focus:outline-none focus:bg-white dark:focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(var(--color-neon-rgb)/0.06)] transition-all duration-200" autocomplete="off">
-        </div>
-        <button type="submit" id="send-btn" class="p-2.5 rounded-xl text-white bg-gradient-to-br from-neon to-blue-600 hover:shadow-lg hover:shadow-neon/25 transition-all active:scale-90 flex-shrink-0 disabled:opacity-20 disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none dark:disabled:from-white/10 dark:disabled:to-white/5" disabled>${I.send}</button>
+        <button type="button" id="chat-upload-btn" aria-label="Anexar ficheiro" class="w-9 h-9 rounded-full text-muted hover:text-neon hover:bg-black/5 dark:hover:bg-white/[0.06] transition-colors active:scale-95 flex-shrink-0 flex items-center justify-center" title="Anexar ficheiro">${I.attach}</button>
+        <button type="button" id="emoji-toggle-btn" aria-label="Reações rápidas" class="w-9 h-9 rounded-full text-muted hover:text-amber-500 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-colors active:scale-95 flex-shrink-0 flex items-center justify-center" title="Reações rápidas">${I.emoji}</button>
+        <input type="text" id="chat-text-input" placeholder="Escreve uma mensagem..."
+               class="flex-1 h-9 px-2 text-[14px] bg-transparent border-0 text-primary placeholder:text-muted/50 focus:outline-none min-w-0" autocomplete="off">
+        <button type="submit" id="send-btn" aria-label="Enviar" class="w-9 h-9 rounded-full text-white bg-neon hover:scale-105 transition-transform active:scale-95 flex-shrink-0 flex items-center justify-center shadow-md shadow-neon/30 disabled:opacity-30 disabled:scale-100 disabled:shadow-none" disabled>${I.send}</button>
     `;
-    inputWrapper.appendChild(inputArea);
+    inputColumn.appendChild(inputArea);
     container.appendChild(inputWrapper);
 
     /* ═══════ STATE ═══════ */
@@ -301,11 +340,10 @@ export function ChatWindow(chat, { onBack } = {}) {
     let subscription = null;
     let replyingTo = null;
     let lastDateShown = '';
-    let typingTimeout = null;
-    let typingChannel = null;
+    // Attachment preview state — file is NOT uploaded until the user hits send.
+    let pendingFile = null;
+    let pendingFileUrl = null; // object URL for image preview thumb
     chatService.markAsRead(chat.id);
-
-    const escapeHtml = (t) => t ? t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
 
     const addDateSep = (dateStr) => {
         const d = new Date(dateStr);
@@ -320,8 +358,8 @@ export function ChatWindow(chat, { onBack } = {}) {
         lastDateShown = key;
         const sep = document.createElement('div');
         sep.className = 'flex justify-center py-4';
-        sep.innerHTML = `<span class="text-[10.5px] font-semibold tracking-wide uppercase text-gray-400/80 bg-white/90 dark:bg-surface/90 backdrop-blur-sm px-3.5 py-1 rounded-full shadow-sm border border-gray-100/50 dark:border-white/[0.06]">${label}</span>`;
-        messagesArea.appendChild(sep);
+        sep.innerHTML = `<span class="text-[11px] font-medium text-white/90 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">${label}</span>`;
+        messagesInner.appendChild(sep);
     };
 
     const renderedMsgIds = new Set(); // dedup guard for broadcast replays
@@ -402,10 +440,15 @@ export function ChatWindow(chat, { onBack } = {}) {
             }
         }
 
-        // Quote/reply handling — with deleted parent support
+        // Quote/reply handling — with deleted parent + deleted-sender support.
         const parentId = msg.reply_to_id || msg.parent?.id || '';
         if (msg.parent) {
-            const pn = msg.parent.profiles?.name || 'Utilizador';
+            // If the replied-to message's sender_id is null, the user was
+            // deleted (FK was SET NULL). Profile join also returns nothing.
+            const parentSenderDeleted = !msg.parent.sender_id;
+            const pn = parentSenderDeleted
+                ? '<span class="italic opacity-70">Conta Eliminada</span>'
+                : escapeHtml(msg.parent.profiles?.name || 'Utilizador');
             const parentDeleted = msg.parent.is_deleted || msg.parent.content === '[Mensagem apagada]';
             const parentContent = parentDeleted
                 ? `<em class="inline-flex items-center gap-1 opacity-50">${I.deleted} Mensagem apagada</em>`
@@ -413,14 +456,13 @@ export function ChatWindow(chat, { onBack } = {}) {
             quoteHtml = `<div class="quote-link mb-1.5 pl-2.5 border-l-2 ${isMe ? 'border-white/40' : 'border-neon/50'} text-[11px] opacity-80 py-0.5 cursor-pointer hover:opacity-100 transition-opacity" data-reply-to="${parentId}"><span class="font-semibold">${pn}</span><br><span class="opacity-70">${parentContent}</span></div>`;
         }
 
+        // Detect a deleted sender — sender_id was SET NULL by the FK
+        // when the auth user was removed.
         const sp = msg.profiles || {};
-        const sLetter = (sp.name || 'U')[0].toUpperCase();
-        const sGradients = [
-            'from-rose-500 to-pink-600', 'from-orange-500 to-amber-600', 'from-amber-400 to-yellow-500',
-            'from-emerald-500 to-green-600', 'from-cyan-400 to-teal-500', 'from-blue-500 to-indigo-600',
-            'from-violet-500 to-purple-600', 'from-pink-500 to-rose-600', 'from-teal-400 to-cyan-500',
-        ];
-        const sGrad = sGradients[sLetter.charCodeAt(0) % sGradients.length];
+        const senderDeleted = !msg.sender_id;
+        const displayName = senderDeleted ? 'Conta Eliminada' : (sp.name || 'Utilizador');
+        const sLetter = senderDeleted ? '?' : ((sp.name || 'U')[0].toUpperCase());
+        const sGrad = senderDeleted ? 'from-gray-500 to-gray-600' : getAvatarGradient(sp.name || 'U');
 
         const el = document.createElement('div');
         el.className = `flex ${isMe ? 'justify-end' : 'justify-start'} group ${animate ? 'animate-scale-in' : ''}`;
@@ -429,40 +471,69 @@ export function ChatWindow(chat, { onBack } = {}) {
         // Check if message is only emojis (for large emoji display)
         const isOnlyEmoji = /^\p{Emoji_Presentation}{1,3}$/u.test(msg.content?.trim() || '');
 
+        // Telegram-style bubble: tight padding, rounded with one corner cut
+        // for the speaker tail. Own = solid neon. Other = clearly contrasted
+        // surface card (bg-surface alone blends into the chat background
+        // in dark mode, so we use a tinted overlay for visibility).
+        const ownBubble = 'bg-neon text-white rounded-[18px] rounded-br-[4px] shadow-sm shadow-neon/20';
+        const otherBubble = 'bg-white dark:bg-white/[0.08] text-primary rounded-[18px] rounded-bl-[4px] shadow-sm ring-1 ring-black/[0.06] dark:ring-white/[0.06]';
+
         el.innerHTML = `
             ${!isMe ? `
-                <div class="self-end mr-2 mb-1 flex-shrink-0">
-                    ${sp.avatar_url
-                    ? `<img src="${sp.avatar_url}" class="w-8 h-8 rounded-xl object-cover ring-1 ring-black/5 dark:ring-white/10">`
-                    : `<div class="w-8 h-8 rounded-xl bg-gradient-to-br ${sGrad} text-white flex items-center justify-center text-xs font-bold shadow-sm">${sLetter}</div>`}
+                <div class="self-end mr-2 mb-0.5 flex-shrink-0">
+                    ${sp.avatar_url && !senderDeleted
+                    ? `<img src="${sp.avatar_url}" alt="" class="w-8 h-8 rounded-full object-cover">`
+                    : `<div class="w-8 h-8 rounded-full bg-gradient-to-br ${sGrad} text-white flex items-center justify-center text-xs font-bold">${sLetter}</div>`}
                 </div>
             ` : ''}
-            <div class="max-w-[75%] md:max-w-[60%] relative group/msg">
-                <div class="${isOnlyEmoji && !msg.file_url ? 'py-1' : `px-3.5 py-2 text-[13.5px] leading-relaxed ${isMe
-                ? 'bg-gradient-to-br from-neon to-blue-600 text-white rounded-2xl rounded-br-sm shadow-md shadow-neon/15'
-                : 'bg-white dark:bg-white/[0.07] text-primary rounded-2xl rounded-bl-sm border border-gray-100/80 dark:border-white/[0.08] shadow-sm'}`}">
-                    ${!isMe && !isOnlyEmoji ? `<div class="text-[11px] font-bold text-neon mb-0.5 flex items-center gap-1">${sp.name || 'Utilizador'}${verifiedBadge(sp.is_verified, 'sm')}</div>` : ''}
+            <div class="max-w-[78%] md:max-w-[60%] relative group/msg">
+                <div class="${isOnlyEmoji && !msg.file_url ? 'py-1' : `px-3 py-1.5 text-[14px] leading-snug ${isMe ? ownBubble : otherBubble}`}">
+                    ${!isMe && !isOnlyEmoji ? `<div class="text-[12px] font-semibold ${senderDeleted ? 'text-muted italic' : 'text-neon'} mb-0.5 flex items-center gap-1">${escapeHtml(displayName)}${senderDeleted ? '' : verifiedBadge(sp.is_verified, 'sm')}</div>` : ''}
                     ${quoteHtml}
-                    <div class="${isOnlyEmoji && !msg.file_url ? 'text-4xl' : 'break-words whitespace-pre-wrap'}">${content}</div>
+                    <div class="${isOnlyEmoji && !msg.file_url ? 'text-5xl drop-shadow-sm' : 'break-words whitespace-pre-wrap'}">${content}</div>
                     ${fileHtml}
                     ${!isOnlyEmoji || msg.file_url ? `<div class="flex items-center justify-end gap-1 mt-0.5 -mb-0.5">
-                        <span class="text-[10px] ${isMe ? 'text-white/50' : 'text-gray-400'} tabular-nums">${time}</span>
-                        ${isMe ? `<svg class="w-3.5 h-3.5 ${isMe ? 'text-white/40' : 'text-gray-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>` : ''}
+                        <span class="text-[10.5px] ${isMe ? 'text-white/70' : 'text-muted/70'} tabular-nums">${time}</span>
+                        ${isMe ? `<svg class="w-3.5 h-3.5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>` : ''}
                     </div>` : ''}
                 </div>
                 <!-- Reply + Delete buttons on hover/tap (hidden for deleted messages) -->
-                ${!isDeleted ? `<button class="reply-btn msg-action-btn absolute top-1/2 -translate-y-1/2 ${isMe ? '-left-9' : '-right-9'} opacity-0 group-hover/msg:opacity-100 p-1.5 md:p-1.5 p-2 rounded-xl bg-white dark:bg-surface shadow-lg text-gray-400 hover:text-neon transition-all duration-200 hover:scale-110 border border-gray-100/80 dark:border-white/[0.08]"
-                    data-id="${msg.id || ''}" data-content="${escapeHtml(msg.content || '')}" data-sender="${sp.name || 'Utilizador'}">${I.reply}</button>` : ''}
-                ${isMe && msg.id && !isDeleted ? `<button class="delete-msg-btn msg-action-btn absolute ${isMe ? '-left-[4.25rem]' : '-right-[4.25rem]'} top-1/2 -translate-y-1/2 opacity-0 group-hover/msg:opacity-100 p-1.5 md:p-1.5 p-2 rounded-xl bg-white dark:bg-surface shadow-lg text-gray-400 hover:text-red-500 transition-all duration-200 hover:scale-110 border border-gray-100/80 dark:border-white/[0.08]"
+                ${!isDeleted ? `<button aria-label="Responder" class="reply-btn msg-action-btn absolute top-1/2 -translate-y-1/2 ${isMe ? '-left-9' : '-right-9'} opacity-0 group-hover/msg:opacity-100 w-7 h-7 rounded-full bg-surface shadow-md ring-1 ring-black/5 dark:ring-white/10 text-muted hover:text-neon transition-opacity duration-150 hover:scale-110 flex items-center justify-center"
+                    data-id="${msg.id || ''}" data-content="${escapeHtml(msg.content || '')}" data-sender="${escapeHtml(displayName)}">${I.reply}</button>` : ''}
+                ${isMe && msg.id && !isDeleted ? `<button aria-label="Apagar" class="delete-msg-btn msg-action-btn absolute ${isMe ? '-left-[4.5rem]' : '-right-[4.5rem]'} top-1/2 -translate-y-1/2 opacity-0 group-hover/msg:opacity-100 w-7 h-7 rounded-full bg-surface shadow-md ring-1 ring-black/5 dark:ring-white/10 text-muted hover:text-red-500 transition-opacity duration-150 hover:scale-110 flex items-center justify-center"
                     data-msg-delete-id="${msg.id}">${I.trash}</button>` : ''}
             </div>
         `;
 
-        messagesArea.appendChild(el);
+        messagesInner.appendChild(el);
         if (isScrolledNearBottom() || !animate) {
             requestAnimationFrame(() => messagesArea.scrollTo({ top: messagesArea.scrollHeight, behavior: animate ? 'smooth' : 'auto' }));
         } else if (animate) {
             showNewMsgBanner();
+        }
+    };
+
+    /* Promote an optimistic message to its real DB version in place — no
+       remove + re-animate flash. Updates the data-msg-id, the reply/delete
+       buttons' ID attrs, and (for attachments) swaps any local blob: URLs
+       to the real public URL. If the optimistic element no longer exists
+       (rare race), falls back to rendering the real message. */
+    const promoteOptimistic = (tmpId, realMsg) => {
+        const tmpEl = messagesArea.querySelector(`[data-msg-id="${tmpId}"]`);
+        if (!tmpEl) {
+            renderMessage(realMsg, true);
+            return;
+        }
+        tmpEl.dataset.msgId = realMsg.id;
+        renderedMsgIds.delete(tmpId);
+        renderedMsgIds.add(realMsg.id);
+        tmpEl.querySelectorAll('.reply-btn').forEach(b => b.dataset.id = realMsg.id);
+        tmpEl.querySelectorAll('.delete-msg-btn').forEach(b => b.dataset.msgDeleteId = realMsg.id);
+        // Swap any blob: previews to the real storage URL.
+        if (realMsg.file_url) {
+            tmpEl.querySelectorAll('img[src^="blob:"]').forEach(n => { n.src = realMsg.file_url; });
+            tmpEl.querySelectorAll('a[href^="blob:"]').forEach(n => { n.href = realMsg.file_url; });
+            tmpEl.querySelectorAll('[data-url^="blob:"]').forEach(n => { n.dataset.url = realMsg.file_url; });
         }
     };
 
@@ -471,7 +542,7 @@ export function ChatWindow(chat, { onBack } = {}) {
         if (!msgId) return;
         const target = messagesArea.querySelector(`[data-msg-id="${msgId}"]`);
         if (!target) {
-            toast('Mensagem não encontrada (pode ser mais antiga).', false);
+            Notification.info('Mensagem não encontrada (pode ser mais antiga).');
             return;
         }
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -562,7 +633,7 @@ export function ChatWindow(chat, { onBack } = {}) {
                 isDanger: true,
                 onConfirm: async () => {
                     const { error } = await chatService.deleteMessage(msgId);
-                    if (error) { toast('Erro ao apagar mensagem.', true); return; }
+                    if (error) { Notification.error('Erro ao apagar mensagem.'); return; }
                     const msgEl = messagesArea.querySelector(`[data-msg-id="${msgId}"]`);
                     if (msgEl) { msgEl.style.transition = 'all 0.3s ease'; msgEl.style.opacity = '0'; msgEl.style.maxHeight = '0'; setTimeout(() => msgEl.remove(), 300); }
                 }
@@ -572,13 +643,39 @@ export function ChatWindow(chat, { onBack } = {}) {
 
     replyBanner.querySelector('#cancel-reply').onclick = () => { replyingTo = null; replyBanner.classList.add('hidden'); };
 
-    // Emoji toggle
+    // Emoji toggle (with click-outside dismissal).
     const emojiToggle = inputArea.querySelector('#emoji-toggle-btn');
+    emojiToggle.setAttribute('aria-expanded', 'false');
+
+    const closeEmojiBar = () => {
+        if (emojiBar.classList.contains('hidden')) return;
+        emojiBar.classList.add('hidden');
+        emojiToggle.classList.remove('text-amber-500', 'bg-amber-500/[0.06]');
+        emojiToggle.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', onEmojiOutside, true);
+        document.removeEventListener('touchstart', onEmojiOutside, true);
+    };
+    const openEmojiBar = () => {
+        emojiBar.classList.remove('hidden');
+        emojiToggle.classList.add('text-amber-500', 'bg-amber-500/[0.06]');
+        emojiToggle.setAttribute('aria-expanded', 'true');
+        // Defer listener attach so the click that opened the bar doesn't
+        // immediately fire the outside handler.
+        setTimeout(() => {
+            document.addEventListener('mousedown', onEmojiOutside, true);
+            document.addEventListener('touchstart', onEmojiOutside, true);
+        }, 0);
+    };
+    // Closes the bar if the user taps anywhere outside it and outside
+    // the toggle button. Picking an emoji or clicking the toggle keeps
+    // it open / lets the toggle handle the state itself.
+    const onEmojiOutside = (e) => {
+        if (emojiBar.contains(e.target) || emojiToggle.contains(e.target)) return;
+        closeEmojiBar();
+    };
     emojiToggle.onclick = () => {
-        const isHidden = emojiBar.classList.contains('hidden');
-        emojiBar.classList.toggle('hidden');
-        emojiToggle.classList.toggle('text-amber-500', isHidden);
-        emojiToggle.classList.toggle('bg-amber-500/[0.06]', isHidden);
+        if (emojiBar.classList.contains('hidden')) openEmojiBar();
+        else closeEmojiBar();
     };
 
     emojiBar.querySelectorAll('.emoji-quick').forEach(btn => {
@@ -595,7 +692,8 @@ export function ChatWindow(chat, { onBack } = {}) {
     textInput.maxLength = MAX_MSG_LENGTH;
     textInput.addEventListener('input', () => {
         const len = textInput.value.length;
-        sendBtn.disabled = !textInput.value.trim() || len > MAX_MSG_LENGTH;
+        // Send is enabled when there's a caption to send OR a pending attachment.
+        sendBtn.disabled = (!textInput.value.trim() && !pendingFile) || len > MAX_MSG_LENGTH;
     });
 
     /* Init */
@@ -605,22 +703,22 @@ export function ChatWindow(chat, { onBack } = {}) {
             const { data: prof } = await profileService.getProfile(currentUser.id);
             currentProfile = prof || {};
         } catch { currentProfile = {}; }
-        messagesArea.innerHTML = `<div class="flex items-center justify-center h-full"><div class="w-8 h-8 border-[3px] border-neon/25 border-t-neon rounded-full animate-spin"></div></div>`;
+        messagesInner.innerHTML = `<div class="flex items-center justify-center h-full"><div class="w-8 h-8 border-[3px] border-neon/25 border-t-neon rounded-full animate-spin"></div></div>`;
 
         const { data: messages } = await chatService.getMessages(chat.id);
-        messagesArea.innerHTML = '';
+        messagesInner.innerHTML = '';
         lastDateShown = '';
 
         if (messages?.length) {
             messages.forEach(m => renderMessage(m));
         } else {
-            messagesArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full text-center">
-                    <div class="w-16 h-16 rounded-full bg-gradient-to-br ${avatarGradient} text-white flex items-center justify-center text-2xl font-bold shadow-lg mb-4">
-                        ${chat.avatar ? `<img src="${chat.avatar}" class="w-full h-full rounded-full object-cover">` : letter}
+            messagesInner.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-center px-6 animate-tg-pop">
+                    <div class="relative w-20 h-20 rounded-full overflow-hidden mb-4 bg-gradient-to-br ${avatarGradient} text-white flex items-center justify-center text-3xl font-bold">
+                        ${chat.avatar ? `<img src="${chat.avatar}" alt="" class="w-full h-full object-cover">` : letter}
                     </div>
-                    <p class="text-sm font-bold text-primary">${chat.name}</p>
-                    <p class="text-xs text-muted mt-1">Envia a primeira mensagem ${I.wave}</p>
+                    <p class="text-[15px] font-semibold text-primary">${chat.name}</p>
+                    <p class="text-[12px] text-muted mt-1.5 flex items-center justify-center gap-1.5">Sê o primeiro a quebrar o gelo ${I.wave}</p>
                 </div>`;
         }
 
@@ -629,20 +727,23 @@ export function ChatWindow(chat, { onBack } = {}) {
                 if (newMsg.sender_id === currentUser.id) return;
                 if (newMsg.id && renderedMsgIds.has(newMsg.id)) return; // dedup guard
 
-                // Broadcast payload is enriched with profiles + parent
-                // Fallback fetch only if profiles missing (edge case)
-                if (!newMsg.profiles) {
-                    try {
-                        const { supabase } = await import('../lib/supabase.js');
-                        if (supabase) {
-                            const { data } = await supabase.from('profiles').select('name, avatar_url, username').eq('id', newMsg.sender_id).single();
-                            newMsg.profiles = data || {};
-                        }
-                    } catch { }
-                }
-                if (messagesArea.querySelector('.h-full')) messagesArea.innerHTML = '';
-                typingUsers.delete(newMsg.sender_id);
-                updateTypingDisplay();
+                // Postgres CDC delivers the raw row only — no joined
+                // profile or reply parent. Re-fetch with joins so the
+                // bubble can render the sender's name/avatar and the
+                // reply quote when applicable.
+                try {
+                    const { supabase } = await import('../lib/supabase.js');
+                    if (supabase && newMsg.id) {
+                        const { data: enriched } = await supabase
+                            .from('messages')
+                            .select('*, profiles:sender_id(name, avatar_url, username, is_verified), parent:reply_to_id(content, sender_id, is_deleted, profiles:sender_id(name))')
+                            .eq('id', newMsg.id)
+                            .single();
+                        if (enriched) newMsg = enriched;
+                    }
+                } catch { /* fall through with raw row */ }
+
+                if (messagesArea.querySelector('.h-full')) messagesInner.innerHTML = '';
                 renderMessage(newMsg, true);
                 chatService.markAsRead(chat.id);
             },
@@ -650,7 +751,7 @@ export function ChatWindow(chat, { onBack } = {}) {
                 // Handle soft-deleted messages — replace content in-place
                 const el = messagesArea.querySelector(`[data-msg-id="${updatedMsg.id}"]`);
                 if (el && (updatedMsg.is_deleted || updatedMsg.content === '[Mensagem apagada]')) {
-                    const bubble = el.querySelector('.break-words, .text-4xl');
+                    const bubble = el.querySelector('.break-words, .text-4xl, .text-5xl');
                     if (bubble) {
                         bubble.innerHTML = `<span class="inline-flex items-center gap-1.5 italic opacity-60">${I.deleted} Mensagem apagada</span>`;
                         bubble.className = 'break-words whitespace-pre-wrap';
@@ -666,110 +767,213 @@ export function ChatWindow(chat, { onBack } = {}) {
                 }
             }
         });
-
-        // Typing indicator subscription (multi-user)
-        try {
-            const { supabase: sb } = await import('../lib/supabase.js');
-            if (sb) {
-                typingChannel = sb.channel(`typing:${chat.id}`);
-                typingChannel.on('broadcast', { event: 'typing' }, (payload) => {
-                    const p = payload.payload;
-                    if (p.user_id !== currentUser.id) {
-                        // Clear existing timer for this user
-                        const existing = typingUsers.get(p.user_id);
-                        if (existing) clearTimeout(existing.timer);
-                        // Set new timer
-                        const timer = setTimeout(() => {
-                            typingUsers.delete(p.user_id);
-                            updateTypingDisplay();
-                        }, 3500);
-                        typingUsers.set(p.user_id, { name: p.name || 'Alguém', timer });
-                        updateTypingDisplay();
-                    }
-                });
-                typingChannel.subscribe();
-            }
-        } catch { }
     };
     init();
 
-    /* File upload */
+    /* Reconcile missed messages.
+       Supabase Broadcast doesn't replay events that fired while a client
+       was disconnected (tab unfocused, brief network drop, etc.). When
+       the tab becomes visible or the window regains focus we refetch
+       the newest messages and render any whose id we haven't seen yet
+       — restores parity without a full reload. */
+    const reconcileMissed = async () => {
+        if (!chat?.id || !currentUser) return;
+        try {
+            const { data } = await chatService.getMessages(chat.id);
+            if (!Array.isArray(data) || data.length === 0) return;
+            let added = 0;
+            for (const m of data) {
+                if (!m.id || renderedMsgIds.has(m.id)) continue;
+                renderMessage(m, false);
+                added++;
+            }
+            if (added > 0) {
+                chatService.markAsRead(chat.id);
+                // Drop any "first message" empty-state placeholder.
+                if (messagesArea.querySelector('.h-full')) messagesInner.querySelector('.h-full')?.remove();
+            }
+        } catch (e) { console.warn('reconcileMissed failed', e); }
+    };
+    // Visibility / focus reconcile is now just a safety net for the rare
+    // case where Postgres CDC reconnects after a network drop — in that
+    // window any events fired while disconnected are lost. Tab-resume
+    // is the natural trigger to catch up. CDC itself handles the
+    // happy path so we no longer need a periodic poll.
+    const onVisibility = () => { if (document.visibilityState === 'visible') reconcileMissed(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', reconcileMissed);
+
+    /* File upload — picking a file no longer sends. It populates a preview
+       banner the user must confirm via the send button. */
     const fileInput = inputArea.querySelector('#chat-file-input');
     inputArea.querySelector('#chat-upload-btn').onclick = () => fileInput.click();
 
-    fileInput.onchange = async () => {
-        const file = fileInput.files[0];
-        if (!file) return;
-        textInput.placeholder = 'A enviar...';
-        textInput.disabled = true;
-        sendBtn.disabled = true;
-        try {
-            const fName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
-            const { error } = await storageService.uploadFile('chat-attachments', fName, file);
-            if (error) throw error;
-            const url = storageService.getPublicUrl('chat-attachments', fName);
-            const tmp = { id: 'tmp_' + Date.now(), sender_id: currentUser.id, content: file.name, file_url: url, created_at: new Date().toISOString(), profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url }, parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null };
-            if (messagesArea.querySelector('.h-full')) messagesArea.innerHTML = '';
-            renderMessage(tmp, true);
-            const { data, error: sendErr } = await chatService.sendMessage(chat.id, file.name, url, replyingTo?.id);
-            if (sendErr) throw sendErr;
-            if (data) {
-                const tmpEl = messagesArea.querySelector(`[data-msg-id="${tmp.id}"]`);
-                if (tmpEl) tmpEl.remove();
-                renderMessage(data, true);
-            }
-            replyingTo = null; replyBanner.classList.add('hidden');
-        } catch (e) { console.error(e); toast('Falha no envio.', true); }
-        finally { textInput.placeholder = 'Mensagem...'; textInput.disabled = false; sendBtn.disabled = !textInput.value.trim(); fileInput.value = ''; }
+    const formatSize = (b) => b < 1024 * 1024
+        ? Math.round(b / 1024) + ' KB'
+        : (b / 1024 / 1024).toFixed(1) + ' MB';
+
+    const showPendingFile = (file) => {
+        if (pendingFileUrl) { try { URL.revokeObjectURL(pendingFileUrl); } catch { } pendingFileUrl = null; }
+        pendingFile = file;
+        const isImage = file.type.startsWith('image/');
+        const fname = file.name;
+        const ext = (fname.split('.').pop() || 'FILE').toUpperCase().slice(0, 4);
+        const size = formatSize(file.size);
+
+        const thumb = isImage
+            ? (() => {
+                pendingFileUrl = URL.createObjectURL(file);
+                return `<div class="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black/5 dark:bg-white/5">
+                            <img src="${pendingFileUrl}" alt="" class="w-full h-full object-cover">
+                        </div>`;
+            })()
+            : `<div class="w-12 h-12 rounded-lg bg-neon/10 flex flex-col items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span class="text-[8.5px] font-bold text-neon tracking-wider mt-0.5">${escapeHtml(ext)}</span>
+                </div>`;
+
+        pendingFileBanner.innerHTML = `
+            <div class="flex items-center gap-3">
+                ${thumb}
+                <div class="flex-1 min-w-0">
+                    <p class="text-[13px] font-semibold text-primary truncate">${escapeHtml(fname)}</p>
+                    <p class="text-[11px] text-muted mt-0.5">${size} · pressiona enviar para confirmar</p>
+                </div>
+                <button type="button" id="cancel-pending-file" aria-label="Remover" class="w-7 h-7 rounded-full text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors active:scale-90 flex items-center justify-center">${I.close}</button>
+            </div>`;
+        pendingFileBanner.classList.remove('hidden');
+        pendingFileBanner.querySelector('#cancel-pending-file').onclick = clearPendingFile;
+        textInput.placeholder = 'Adiciona uma legenda (opcional)...';
+        sendBtn.disabled = false;
+        textInput.focus();
     };
 
-    /* Send text */
+    const clearPendingFile = () => {
+        pendingFile = null;
+        if (pendingFileUrl) { try { URL.revokeObjectURL(pendingFileUrl); } catch { } pendingFileUrl = null; }
+        pendingFileBanner.classList.add('hidden');
+        pendingFileBanner.innerHTML = '';
+        textInput.placeholder = 'Escreve uma mensagem...';
+        sendBtn.disabled = !textInput.value.trim();
+        fileInput.value = '';
+    };
+
+    fileInput.onchange = () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const check = validateChatFile(file);
+        if (!check.ok) {
+            Notification.error(check.reason);
+            fileInput.value = '';
+            return;
+        }
+        // Auto-close the emoji bar — it would otherwise float above the
+        // preview banner and look like a stuck panel.
+        closeEmojiBar();
+        showPendingFile(file);
+    };
+
+    /* Send — handles text-only AND file-with-optional-caption.
+       File uploads now go through this confirmation step instead of
+       firing on file-pick. */
     inputArea.onsubmit = async (e) => {
         e.preventDefault();
         const text = textInput.value.trim();
-        if (!text) return;
-        textInput.value = ''; sendBtn.disabled = true;
-        typingIndicator.style.maxHeight = '0';
-        const tmp = { id: 'tmp_' + Date.now(), sender_id: currentUser.id, content: text, created_at: new Date().toISOString(), profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url }, parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null };
-        if (messagesArea.querySelector('.h-full')) messagesArea.innerHTML = '';
-        renderMessage(tmp, true);
-        const { data, error } = await chatService.sendMessage(chat.id, text, null, replyingTo?.id);
-        if (error) toast('Erro ao enviar.', true);
-        else if (data) {
-            const tmpEl = messagesArea.querySelector(`[data-msg-id="${tmp.id}"]`);
-            if (tmpEl) tmpEl.remove();
-            renderMessage(data, true);
-        }
-        replyingTo = null; replyBanner.classList.add('hidden');
-    };
 
-    // Broadcast typing on input
-    textInput.addEventListener('input', () => {
-        sendBtn.disabled = !textInput.value.trim();
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(async () => {
-            if (typingChannel && textInput.value.trim()) {
-                typingChannel.send({
-                    type: 'broadcast',
-                    event: 'typing',
-                    payload: { user_id: currentUser.id, name: currentProfile?.name || 'Alguém' }
-                });
+        // File path — upload + send. Caption is optional; falls back to filename
+        // (the messages.content column is NOT NULL).
+        if (pendingFile) {
+            const fileToSend = pendingFile;
+            const caption = text || fileToSend.name;
+            const savedReplyingTo = replyingTo;
+            // Hand off ownership of the preview URL to the optimistic message
+            // so we can revoke it after the real one arrives.
+            const previewUrl = pendingFileUrl;
+            pendingFileUrl = null;
+
+            // Clear UI state immediately so the user gets visual feedback.
+            pendingFile = null;
+            pendingFileBanner.classList.add('hidden');
+            pendingFileBanner.innerHTML = '';
+            textInput.value = '';
+            textInput.placeholder = 'Escreve uma mensagem...';
+            sendBtn.disabled = true;
+            fileInput.value = '';
+            replyingTo = null;
+            replyBanner.classList.add('hidden');
+
+            const tmpId = 'tmp_' + Date.now();
+            const tmp = {
+                id: tmpId,
+                sender_id: currentUser.id,
+                content: caption,
+                file_url: previewUrl || '',
+                created_at: new Date().toISOString(),
+                profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url },
+                parent: savedReplyingTo ? { content: savedReplyingTo.content, profiles: { name: savedReplyingTo.sender } } : null
+            };
+            if (messagesArea.querySelector('.h-full')) messagesInner.innerHTML = '';
+            renderMessage(tmp, true);
+
+            try {
+                const fName = `${Date.now()}_${fileToSend.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+                const { error } = await storageService.uploadFile('chat-attachments', fName, fileToSend);
+                if (error) throw error;
+                const url = storageService.getPublicUrl('chat-attachments', fName);
+                const { data, error: sendErr } = await chatService.sendMessage(chat.id, caption, url, savedReplyingTo?.id);
+                if (sendErr) throw sendErr;
+                if (data) promoteOptimistic(tmpId, data);
+            } catch (err) {
+                console.error(err);
+                Notification.error('Falha no envio do ficheiro.');
+                const tmpEl = messagesArea.querySelector(`[data-msg-id="${tmpId}"]`);
+                if (tmpEl) { tmpEl.style.opacity = '0.5'; }
+            } finally {
+                if (previewUrl) { try { URL.revokeObjectURL(previewUrl); } catch { } }
             }
-        }, 300);
-    });
+            return;
+        }
 
-    const toast = (msg, isErr = false) => {
-        const el = document.createElement('div');
-        el.className = `fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 ${isErr ? 'bg-red-500' : 'bg-neon'} text-white text-sm font-medium rounded-full shadow-xl z-[200]`;
-        el.textContent = msg;
-        document.body.appendChild(el);
-        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+        // Text-only path.
+        if (!text) return;
+        // Snapshot the reply context, then clear the UI immediately so the
+        // banner doesn't hang around for the network round-trip.
+        const sendingReplyTo = replyingTo;
+        replyingTo = null;
+        replyBanner.classList.add('hidden');
+        textInput.value = '';
+        sendBtn.disabled = true;
+
+        const tmp = {
+            id: 'tmp_' + Date.now(),
+            sender_id: currentUser.id,
+            content: text,
+            created_at: new Date().toISOString(),
+            profiles: { name: currentProfile?.name || 'Eu', avatar_url: currentProfile?.avatar_url },
+            parent: sendingReplyTo ? { content: sendingReplyTo.content, profiles: { name: sendingReplyTo.sender } } : null
+        };
+        if (messagesArea.querySelector('.h-full')) messagesInner.innerHTML = '';
+        renderMessage(tmp, true);
+
+        const { data, error } = await chatService.sendMessage(chat.id, text, null, sendingReplyTo?.id);
+        if (error) Notification.error('Erro ao enviar.');
+        else if (data) promoteOptimistic(tmp.id, data);
     };
+
+    // Keep send-enabled state consistent (text OR pending attachment is enough).
+    textInput.addEventListener('input', () => {
+        sendBtn.disabled = !textInput.value.trim() && !pendingFile;
+    });
 
     container.cleanup = () => {
         if (subscription) subscription.unsubscribe();
-        if (typingChannel) typingChannel.unsubscribe();
-        clearTimeout(typingTimeout);
+        if (pendingFileUrl) { try { URL.revokeObjectURL(pendingFileUrl); } catch { } }
+        // Make sure outside-click listeners don't outlive the component.
+        document.removeEventListener('mousedown', onEmojiOutside, true);
+        document.removeEventListener('touchstart', onEmojiOutside, true);
+        // Reconcile listeners.
+        document.removeEventListener('visibilitychange', onVisibility);
+        window.removeEventListener('focus', reconcileMissed);
     };
     return container;
 }

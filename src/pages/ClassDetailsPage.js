@@ -1,4 +1,5 @@
 import { escapeHtml } from '../lib/utils.js';
+import { getAvatarGradient } from '../lib/avatar.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { authService } from '../features/auth/services/authService.js';
 import { classService } from '../services/classService.js';
@@ -215,6 +216,7 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
             if (tabId === 'people') renderPeople();
             if (tabId === 'calendar') renderCalendar();
             if (tabId === 'chat') renderChat();
+            if (tabId === 'settings') renderSettings();
         }
         
         // Sync URL — use replaceState on initial load to avoid duplicate
@@ -317,8 +319,8 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
             form.className = 'p-5 rounded-2xl border-2 border-dashed border-gray-300 dark:border-white/10 mb-6 hover:border-neon/40 transition-colors';
             form.innerHTML = `
                 <h4 class="text-sm font-bold text-muted mb-3 flex items-center gap-2">${I.plus} Novo Anúncio</h4>
-                <input type="text" id="note-title" placeholder="Título do anúncio..." maxlength="100" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary font-bold mb-3 focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-all text-sm" />
-                <textarea id="note-content" rows="3" placeholder="Escrever conteúdo (opcional)..." maxlength="1000" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary mb-3 focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-all text-sm resize-none"></textarea>
+                <input type="text" id="note-title" placeholder="Título do anúncio..." maxlength="100" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary font-bold mb-3 focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-colors text-sm" />
+                <textarea id="note-content" rows="3" placeholder="Escrever conteúdo (opcional)..." maxlength="1000" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary mb-3 focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-colors text-sm resize-none"></textarea>
                 <button id="save-note-btn" class="px-5 py-2 rounded-xl bg-neon text-black font-bold text-sm hover:bg-white transition-all shadow-lg shadow-neon/20">Publicar</button>
             `;
 
@@ -378,12 +380,6 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
     let lastDateShown = '';
     let replyingTo = null;
 
-    const gradients = [
-        'from-rose-500 to-pink-600', 'from-orange-500 to-amber-600', 'from-amber-400 to-yellow-500',
-        'from-emerald-500 to-green-600', 'from-cyan-400 to-teal-500', 'from-blue-500 to-indigo-600',
-        'from-violet-500 to-purple-600', 'from-pink-500 to-rose-600', 'from-teal-400 to-cyan-500',
-    ];
-
     function addDateSeparator(container, dateStr) {
         const d = new Date(dateStr);
         const today = new Date();
@@ -407,9 +403,11 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         if (msg.id) renderedClassMsgIds.add(msg.id);
         const isMine = msg.sender_id === user.id;
         const sp = msg.profiles || {};
-        const name = sp.name || 'Utilizador';
-        const sLetter = name[0]?.toUpperCase() || 'U';
-        const sGrad = gradients[sLetter.charCodeAt(0) % gradients.length];
+        // sender_id was SET NULL by the FK when the auth user was deleted.
+        const senderDeleted = !msg.sender_id;
+        const name = senderDeleted ? 'Conta Eliminada' : (sp.name || 'Utilizador');
+        const sLetter = senderDeleted ? '?' : (name[0]?.toUpperCase() || 'U');
+        const sGrad = senderDeleted ? 'from-gray-500 to-gray-600' : getAvatarGradient(name);
         const time = new Date(msg.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
 
         if (msg.created_at) addDateSeparator(msgContainer, msg.created_at);
@@ -463,7 +461,10 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         let quoteHtml = '';
         const parentId = msg.reply_to_id || msg.parent?.id || '';
         if (msg.parent) {
-            const pn = msg.parent.profiles?.name || 'Utilizador';
+            const parentSenderDeleted = !msg.parent.sender_id;
+            const pn = parentSenderDeleted
+                ? '<span class="italic opacity-70">Conta Eliminada</span>'
+                : escapeHtml(msg.parent.profiles?.name || 'Utilizador');
             quoteHtml = `<div class="quote-link mb-1.5 pl-2.5 border-l-2 ${isMine ? 'border-white/40' : 'border-neon/50'} text-[11px] opacity-80 py-0.5 cursor-pointer hover:opacity-100 transition-opacity" data-reply-to="${parentId}"><span class="font-semibold">${pn}</span><br><span class="opacity-70">${escapeHtml(msg.parent.content) || '📎'}</span></div>`;
         }
 
@@ -474,8 +475,8 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         el.innerHTML = `
             ${!isMine ? `
                 <div class="self-end mr-2 mb-1 flex-shrink-0">
-                    ${sp.avatar_url
-                    ? `<img src="${sp.avatar_url}" class="w-8 h-8 rounded-xl object-cover ring-1 ring-black/5 dark:ring-white/10">`
+                    ${sp.avatar_url && !senderDeleted
+                    ? `<img src="${sp.avatar_url}" alt="" class="w-8 h-8 rounded-xl object-cover ring-1 ring-black/5 dark:ring-white/10">`
                     : `<div class="w-8 h-8 rounded-xl bg-gradient-to-br ${sGrad} text-white flex items-center justify-center text-xs font-bold shadow-sm">${sLetter}</div>`}
                 </div>
             ` : ''}
@@ -484,7 +485,7 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
                     ${isMine
                 ? 'bg-gradient-to-br from-neon to-blue-600 text-white rounded-2xl rounded-br-sm shadow-md shadow-neon/15'
                 : 'bg-white dark:bg-white/[0.07] text-primary rounded-2xl rounded-bl-sm border border-gray-100/80 dark:border-white/[0.08] shadow-sm'}">
-                    ${!isMine ? `<div class="text-[11px] font-bold text-neon mb-0.5">${name}</div>` : ''}
+                    ${!isMine ? `<div class="text-[11px] font-bold ${senderDeleted ? 'text-muted italic' : 'text-neon'} mb-0.5">${escapeHtml(name)}</div>` : ''}
                     ${quoteHtml}
                     <div class="break-words whitespace-pre-wrap">${content}</div>
                     ${fileHtml}
@@ -578,6 +579,9 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
                     </div>
                 </div>
 
+                <!-- Pending attachment preview -->
+                <div id="class-pending-file" class="mx-3 my-2 px-3.5 py-2.5 rounded-2xl crisp-glass hidden"></div>
+
                 <!-- Input -->
                 <div class="border-t border-gray-200 dark:border-white/[0.08] p-3 bg-gray-50/60 dark:bg-white/[0.02]">
                     <div class="flex items-center gap-2">
@@ -601,6 +605,12 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         const replyBanner = sec.querySelector('#class-reply-banner');
         const replyText = sec.querySelector('#class-reply-text');
         const cancelReply = sec.querySelector('#class-cancel-reply');
+        const pendingFileBanner = sec.querySelector('#class-pending-file');
+
+        // Attachment preview state — file is NOT uploaded until the user
+        // confirms by hitting send.
+        let pendingFile = null;
+        let pendingFileUrl = null;
 
         // Render existing messages
         if (messages?.length) {
@@ -610,9 +620,9 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         }
         msgContainer.scrollTop = msgContainer.scrollHeight;
 
-        // Enable/disable send
+        // Enable/disable send (text OR pending attachment is enough)
         chatInput.addEventListener('input', () => {
-            sendBtn.disabled = !chatInput.value.trim();
+            sendBtn.disabled = !chatInput.value.trim() && !pendingFile;
         });
 
         // Cancel reply
@@ -649,9 +659,111 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
             }
         });
 
-        // Send message
+        // ── Attachment preview helpers ──
+        const formatSize = (b) => b < 1024 * 1024
+            ? Math.round(b / 1024) + ' KB'
+            : (b / 1024 / 1024).toFixed(1) + ' MB';
+
+        const showPendingFile = (file) => {
+            if (pendingFileUrl) { try { URL.revokeObjectURL(pendingFileUrl); } catch { } pendingFileUrl = null; }
+            pendingFile = file;
+            const isImage = file.type.startsWith('image/');
+            const fname = file.name;
+            const ext = (fname.split('.').pop() || 'FILE').toUpperCase().slice(0, 4);
+            const size = formatSize(file.size);
+
+            const thumb = isImage
+                ? (() => {
+                    pendingFileUrl = URL.createObjectURL(file);
+                    return `<div class="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black/5 dark:bg-white/5">
+                                <img src="${pendingFileUrl}" alt="" class="w-full h-full object-cover">
+                            </div>`;
+                })()
+                : `<div class="w-12 h-12 rounded-lg bg-neon/10 flex flex-col items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span class="text-[8.5px] font-bold text-neon tracking-wider mt-0.5">${escapeHtml(ext)}</span>
+                    </div>`;
+
+            pendingFileBanner.innerHTML = `
+                <div class="flex items-center gap-3">
+                    ${thumb}
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[13px] font-semibold text-primary truncate">${escapeHtml(fname)}</p>
+                        <p class="text-[11px] text-muted mt-0.5">${size} · pressiona enviar para confirmar</p>
+                    </div>
+                    <button type="button" id="class-cancel-pending-file" aria-label="Remover" class="w-7 h-7 rounded-full text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors active:scale-90 flex items-center justify-center">${I.close}</button>
+                </div>`;
+            pendingFileBanner.classList.remove('hidden');
+            pendingFileBanner.querySelector('#class-cancel-pending-file').onclick = clearPendingFile;
+            chatInput.placeholder = 'Adiciona uma legenda (opcional)...';
+            sendBtn.disabled = false;
+            chatInput.focus();
+        };
+
+        const clearPendingFile = () => {
+            pendingFile = null;
+            if (pendingFileUrl) { try { URL.revokeObjectURL(pendingFileUrl); } catch { } pendingFileUrl = null; }
+            pendingFileBanner.classList.add('hidden');
+            pendingFileBanner.innerHTML = '';
+            chatInput.placeholder = 'Escreve uma mensagem...';
+            sendBtn.disabled = !chatInput.value.trim();
+            fileInput.value = '';
+        };
+
+        // Send message — text-only OR file-with-optional-caption.
         const sendMessage = async () => {
             const content = chatInput.value.trim();
+
+            if (pendingFile) {
+                const fileToSend = pendingFile;
+                const caption = content || fileToSend.name;
+                const savedReplyingTo = replyingTo;
+                const previewUrl = pendingFileUrl;
+                pendingFileUrl = null;
+
+                // Reset UI immediately for fast feedback.
+                pendingFile = null;
+                pendingFileBanner.classList.add('hidden');
+                pendingFileBanner.innerHTML = '';
+                chatInput.value = '';
+                chatInput.placeholder = 'Escreve uma mensagem...';
+                sendBtn.disabled = true;
+                fileInput.value = '';
+                replyingTo = null;
+                replyBanner.classList.add('hidden');
+
+                const optimisticId = 'optimistic-' + Date.now();
+                const optimistic = {
+                    id: optimisticId,
+                    sender_id: user.id,
+                    content: caption,
+                    file_url: previewUrl || '',
+                    created_at: new Date().toISOString(),
+                    profiles: { name: userProfile.name || 'Tu', avatar_url: userProfile.avatar_url },
+                    parent: savedReplyingTo ? { content: savedReplyingTo.content, profiles: { name: savedReplyingTo.sender } } : null,
+                    reply_to_id: savedReplyingTo?.id || null
+                };
+                const emptyState = msgContainer.querySelector('.h-full');
+                if (emptyState) msgContainer.innerHTML = '';
+                renderChatMessageEl(optimistic, msgContainer, true);
+
+                try {
+                    const fName = `${Date.now()}_${fileToSend.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+                    const { error } = await storageService.uploadFile('chat-attachments', fName, fileToSend);
+                    if (error) throw error;
+                    const url = storageService.getPublicUrl('chat-attachments', fName);
+                    await chatService.sendMessage(classChatId, caption, url, savedReplyingTo?.id);
+                } catch (err) {
+                    console.error(err);
+                    Notification.error('Falha no envio do ficheiro.');
+                } finally {
+                    if (previewUrl) { try { URL.revokeObjectURL(previewUrl); } catch { } }
+                }
+                chatInput.focus();
+                return;
+            }
+
+            // Text-only path (unchanged)
             if (!content) return;
             chatInput.value = '';
             sendBtn.disabled = true;
@@ -683,45 +795,35 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         };
 
-        // File upload
+        // File picker — just queue the file. Upload happens on send.
+        // Client-side size + MIME validation mirrors the chat-attachments
+        // bucket policy in create_all.sql (10 MB, restricted MIME types).
+        const CHAT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+        const CHAT_ALLOWED_MIME = new Set([
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+            'application/pdf', 'text/plain', 'application/zip',
+            'audio/mpeg', 'audio/wav', 'audio/ogg',
+            'video/mp4', 'video/webm',
+        ]);
         attachBtn.onclick = () => fileInput.click();
-        fileInput.onchange = async () => {
+        fileInput.onchange = () => {
             const file = fileInput.files[0];
             if (!file) return;
-            chatInput.placeholder = '📤 A enviar ficheiro...';
-            chatInput.disabled = true;
-            sendBtn.disabled = true;
-            try {
-                const fName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
-                const { error } = await storageService.uploadFile('chat-attachments', fName, file);
-                if (error) throw error;
-                const url = storageService.getPublicUrl('chat-attachments', fName);
-                const tmp = {
-                    sender_id: user.id,
-                    content: `📎 ${file.name}`,
-                    file_url: url,
-                    created_at: new Date().toISOString(),
-                    profiles: { name: userProfile.name || 'Tu', avatar_url: userProfile.avatar_url },
-                    parent: replyingTo ? { content: replyingTo.content, profiles: { name: replyingTo.sender } } : null
-                };
-                const emptyState = msgContainer.querySelector('.h-full');
-                if (emptyState) msgContainer.innerHTML = '';
-                renderChatMessageEl(tmp, msgContainer, true);
-                await chatService.sendMessage(classChatId, `📎 ${file.name}`, url, replyingTo?.id);
-                replyingTo = null;
-                replyBanner.classList.add('hidden');
-            } catch (err) {
-                console.error(err);
-                Notification.error('Falha no envio do ficheiro.');
-            } finally {
-                chatInput.placeholder = 'Escreve uma mensagem...';
-                chatInput.disabled = false;
-                sendBtn.disabled = !chatInput.value.trim();
+            if (file.size > CHAT_MAX_FILE_SIZE) {
+                Notification.error('Ficheiro demasiado grande (máx. 10 MB).');
                 fileInput.value = '';
+                return;
             }
+            if (file.type && !CHAT_ALLOWED_MIME.has(file.type)) {
+                Notification.error('Tipo de ficheiro não suportado.');
+                fileInput.value = '';
+                return;
+            }
+            showPendingFile(file);
         };
 
-        // Realtime subscription (broadcast-based)
+        // Realtime subscription — backed by Postgres CDC. Payload is the
+        // raw row; we re-fetch with joins to get profile + reply parent.
         if (chatSubscription) chatSubscription.unsubscribe();
         chatSubscription = chatService.subscribeToChat(classChatId, {
             onInsert: async (newMsg) => {
@@ -987,12 +1089,12 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
                                 <div>
                                     <label class="block text-[11px] font-bold text-muted uppercase tracking-widest mb-2">Nome da Turma</label>
                                     <input type="text" id="edit-name" value="${classData.name}"
-                                        class="w-full bg-background border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-primary focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-all placeholder:text-gray-400 text-center sm:text-left">
+                                        class="w-full bg-background border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-primary focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-colors placeholder:text-gray-400 text-center sm:text-left">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-bold text-muted uppercase tracking-widest mb-2">Descrição</label>
                                     <textarea id="edit-desc" rows="3"
-                                        class="w-full bg-background border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-primary focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-all resize-none placeholder:text-gray-400 leading-relaxed text-center sm:text-left">${classData.description || ''}</textarea>
+                                        class="w-full bg-background border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-primary focus:outline-none focus:border-neon focus:ring-4 focus:ring-neon/10 transition-colors resize-none placeholder:text-gray-400 leading-relaxed text-center sm:text-left">${classData.description || ''}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -1237,11 +1339,18 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         if (currentTab?.id === 'tab-stream') reloadAssignments();
     };
 
-    realtimeManager.subscribe(`class:${classId}:assignments`, 'assignments', `class_id=eq.${classId}`,
+    realtimeManager.subscribe(`class:${classId}:assignments`, 'assignments',
+        { column: 'class_id', value: classId },
         ['INSERT', 'UPDATE', 'DELETE'], () => reloadAssignments());
-    realtimeManager.subscribe(`class:${classId}:feed_posts`, 'class_feed_posts', `class_id=eq.${classId}`,
+    // Feed posts live in class_notes. The CDC filter scopes events to
+    // this class, so only relevant posts trigger a refresh.
+    realtimeManager.subscribe(`class:${classId}:feed_posts`, 'class_notes',
+        { column: 'class_id', value: classId },
         ['INSERT', 'UPDATE', 'DELETE'], refreshCurrentTab);
-    realtimeManager.subscribe(`class:${classId}:feed_reactions`, 'class_feed_reactions', null,
+    // Comments live in note_comments. We can't filter by class_id at
+    // the table level (no such column), so we listen broadly and let
+    // refreshCurrentTab decide whether to refetch.
+    realtimeManager.subscribe(`class:${classId}:feed_reactions`, 'note_comments', null,
         ['INSERT', 'DELETE'], refreshCurrentTab);
 
     wrapper.cleanup = () => {

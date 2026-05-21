@@ -21,8 +21,11 @@ const routes = {
     '/home': { component: LandingPage },
     '/': { component: LandingPage },
     '/docs': { component: DocumentationPage },
-    '/changelog': { component: ChangelogPage },
-    '/changelogs': { component: ChangelogPage }, // Alias
+    // `appShell: true` tells the router this public route shares the
+    // logged-in app chrome (AppHeader) and shouldn't have it stripped on
+    // entry — that strip causes a visible header flash on navigation.
+    '/changelog': { component: ChangelogPage, appShell: true },
+    '/changelogs': { component: ChangelogPage, appShell: true }, // Alias
     '/profile': { component: ProfilePage, guard: true },
     '/profile/:username': { component: ProfilePage, guard: true },
 
@@ -104,6 +107,10 @@ if (supabase) {
         }
 
         if (event === 'SIGNED_OUT') {
+            // Drop every cached page so a different user can't see the
+            // previous session's data on quick re-login.
+            if (typeof router.clearCache === 'function') router.clearCache();
+
             // Only redirect to login if we are on a guarded route
             const isPublic = PUBLIC_ROUTES.includes(path);
             const isAuth = AUTH_ONLY_ROUTES.includes(path);

@@ -29,7 +29,7 @@ export async function LoginPage() {
       <div>
         <label class="block text-sm font-medium text-muted mb-1">E-mail ou @utilizador</label>
         <input type="text" id="identifier" required maxlength="100"
-          class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+          class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
           placeholder="exemplo@escola.pt ou @utilizador">
       </div>
       
@@ -41,7 +41,7 @@ export async function LoginPage() {
 
         <div class="relative group">
             <input type="password" id="password" required maxlength="72"
-              class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-all placeholder-muted/50"
+              class="w-full bg-surface border border-border dark:bg-white/5 dark:border-white/10 rounded-lg px-4 py-3 text-primary focus:outline-none focus:border-neon focus:ring-1 focus:ring-neon/50 transition-colors placeholder-muted/50"
               placeholder="••••••••">
             <button type="button" id="toggle-password" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-neon transition-all p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5">
                 <svg id="eye-icon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -126,7 +126,7 @@ export function EditProfileModal(currentProfile, onSuccess) {
                 return;
             }
             usernameTimer = setTimeout(async () => {
-                const { available } = await profileService.checkUsernameAvailability(val, currentProfile.role, currentProfile.id);
+                const { available } = await profileService.checkUsernameAvailability(val, currentProfile.id);
                 usernameFeedback.classList.remove('hidden');
                 if (available) {
                     usernameFeedback.className = 'text-[10px] mt-0.5 ml-0.5 text-emerald-500 font-semibold';
@@ -145,16 +145,18 @@ export function EditProfileModal(currentProfile, onSuccess) {
             tagsContainer.innerHTML = `<span class="text-xs text-gray-400 italic py-0.5">Sem tags</span>`;
             return;
         }
-        tagsContainer.innerHTML = tags.map((tag, index) => `
+        tagsContainer.innerHTML = tags.map(tag => `
             <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-white/[0.08] text-primary border border-gray-200/50 dark:border-white/[0.06] flex items-center gap-1">
                 <span class="text-neon">#</span>${tag}
-                <button type="button" data-index="${index}" class="text-red-400 hover:text-red-500 opacity-70 hover:opacity-100 transition-opacity text-sm leading-none ml-0.5">×</button>
+                <button type="button" data-tag="${tag}" aria-label="Remover tag" class="text-red-400 hover:text-red-500 opacity-70 hover:opacity-100 transition-opacity text-sm leading-none ml-0.5">×</button>
             </span>
         `).join('');
 
         tagsContainer.querySelectorAll('button').forEach(btn => {
             btn.onclick = () => {
-                tags.splice(btn.dataset.index, 1);
+                const tagValue = btn.dataset.tag;
+                const idx = tags.indexOf(tagValue);
+                if (idx >= 0) tags.splice(idx, 1);
                 renderTags();
             };
         });

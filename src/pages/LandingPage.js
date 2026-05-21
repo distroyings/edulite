@@ -586,26 +586,6 @@ export async function LandingPage() {
   document.addEventListener('click', handleAnchor);
   _cleanups.push(() => document.removeEventListener('click', handleAnchor));
 
-  // --- Hero stagger animation ---
-  setTimeout(() => {
-    const badge = hero.querySelector('.landing-badge');
-    const headline = hero.querySelector('.landing-headline');
-    const subtitle = headline?.nextElementSibling;
-    const ctas = subtitle?.nextElementSibling;
-    const trust = ctas?.nextElementSibling;
-
-    [badge, headline, subtitle, ctas, trust].forEach((el, i) => {
-      if (el) {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(25px)';
-        el.style.transition = 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
-        setTimeout(() => {
-          el.style.opacity = '1';
-          el.style.transform = 'translateY(0)';
-        }, 200 + i * 120);
-      }
-    });
-  }, 50);
 
 
   // --- Cleanup ---

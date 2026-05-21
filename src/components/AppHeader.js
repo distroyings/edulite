@@ -5,13 +5,14 @@ import { chatService } from '../services/chatService.js';
 import { realtimeManager } from '../lib/RealtimeManager.js';
 import { t } from '../lib/i18n.js';
 import { getAvatar } from '../lib/avatar.js';
+import { escapeHtml } from '../lib/utils.js';
 import { Logo } from './Logo.js';
 
 // Icons
 const Icons = {
     search: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
     bell: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>`,
-    sun: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707M12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>`,
+    sun: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>`,
     moon: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>`,
     dashboard: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>`,
     calendar: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`,
@@ -327,13 +328,13 @@ export async function AppHeader() {
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-2">
-                                <h4 class="text-[13px] font-bold text-primary leading-tight">${n.title}</h4>
+                                <h4 class="text-[13px] font-bold text-primary leading-tight">${escapeHtml(n.title)}</h4>
                                 <div class="flex items-center gap-1.5 shrink-0">
                                     <span class="text-[10px] text-muted/60 font-mono">${timeAgo(n.created_at)}</span>
                                     ${!n.is_read ? '<div class="w-2 h-2 rounded-full bg-neon shrink-0 animate-pulse"></div>' : ''}
                                 </div>
                             </div>
-                            ${n.body ? `<p class="text-xs text-muted mt-0.5 line-clamp-2">${n.body}</p>` : ''}
+                            ${n.body ? `<p class="text-xs text-muted mt-0.5 line-clamp-2">${escapeHtml(n.body)}</p>` : ''}
                         </div>
                         <button class="notif-dismiss shrink-0 self-center opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 text-muted hover:text-red-500 transition-all" data-dismiss-id="${n.id}" title="Remover">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -413,8 +414,8 @@ export async function AppHeader() {
                 toast.innerHTML = `
                     <div class="shrink-0 w-9 h-9 rounded-xl ${iconColor} flex items-center justify-center">${icon}</div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-[13px] font-bold text-primary leading-tight">${newNotif.title}</p>
-                        ${newNotif.body ? `<p class="text-xs text-muted mt-0.5 line-clamp-1">${newNotif.body}</p>` : ''}
+                        <p class="text-[13px] font-bold text-primary leading-tight">${escapeHtml(newNotif.title)}</p>
+                        ${newNotif.body ? `<p class="text-xs text-muted mt-0.5 line-clamp-1">${escapeHtml(newNotif.body)}</p>` : ''}
                     </div>`;
                 toast.onclick = () => {
                     toast.remove();
@@ -485,12 +486,21 @@ export async function AppHeader() {
         }
     };
 
-    // Mark All Read
+    // Mark All Read — guard against double-click while in-flight.
+    let markReadInFlight = false;
     markReadBtn.onclick = async (e) => {
         e.stopPropagation();
-        await notificationService.markAllRead();
-        notifications.forEach(n => n.is_read = true);
-        renderNotifications();
+        if (markReadInFlight) return;
+        markReadInFlight = true;
+        markReadBtn.disabled = true;
+        try {
+            await notificationService.markAllRead();
+            notifications.forEach(n => n.is_read = true);
+            renderNotifications();
+        } finally {
+            markReadInFlight = false;
+            markReadBtn.disabled = false;
+        }
     };
 
     // 5. Theme Toggle

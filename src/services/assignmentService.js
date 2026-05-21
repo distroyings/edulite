@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase.js';
 import { notificationService } from './notificationService.js';
-import { RealtimeManager } from '../lib/RealtimeManager.js';
 
 export const assignmentService = {
     async createAssignment(classId, title, description, dueDate, attachments, hasGrading = false, maxGrade = 20) {
@@ -25,9 +24,6 @@ export const assignmentService = {
             .single();
 
         if (error) return { error };
-
-        // Broadcast for live updates
-        RealtimeManager.broadcast('assignments', 'INSERT', assignment);
 
         // 2. Notify all class members
         notificationService.notifyClassMembers(
@@ -71,8 +67,6 @@ export const assignmentService = {
             .select()
             .single();
 
-        if (!error && data) RealtimeManager.broadcast('assignments', 'UPDATE', data);
-
         return { data, error };
     },
 
@@ -83,8 +77,6 @@ export const assignmentService = {
             .from('assignments')
             .delete()
             .eq('id', assignmentId);
-
-        if (!error) RealtimeManager.broadcast('assignments', 'DELETE', { id: assignmentId });
 
         return { error };
     },
@@ -317,28 +309,21 @@ export const assignmentService = {
             .select('*, assignments(title, class_id)')
             .single();
 
-        // Notify the student about their grade
-        if (!error && data && grade !== null && grade !== '') {
+        // Notify the student about their grade. The updated row already includes
+        // user_id via select('*'), so no extra fetch is needed.
+        if (!error && data && data.user_id && grade !== null && grade !== '') {
             (async () => {
                 try {
-                    // Get the student's user_id from the submission
-                    const { data: sub } = await supabase
-                        .from('submissions')
-                        .select('user_id')
-                        .eq('id', submissionId)
-                        .single();
-                    if (sub?.user_id) {
-                        const assignTitle = data.assignments?.title || 'tarefa';
-                        const fbText = feedback ? ` Feedback: "${feedback}"` : '';
-                        await notificationService.createNotification(
-                            sub.user_id,
-                            'grade_received',
-                            'Avaliação Recebida',
-                            `Recebeste ${grade} na tarefa "${assignTitle}".${fbText}`,
-                            data.assignments?.class_id ? `/class/${data.assignments.class_id}` : '',
-                            submissionId
-                        );
-                    }
+                    const assignTitle = data.assignments?.title || 'tarefa';
+                    const fbText = feedback ? ` Feedback: "${feedback}"` : '';
+                    await notificationService.createNotification(
+                        data.user_id,
+                        'grade_received',
+                        'Avaliação Recebida',
+                        `Recebeste ${grade} na tarefa "${assignTitle}".${fbText}`,
+                        data.assignments?.class_id ? `/class/${data.assignments.class_id}` : '',
+                        submissionId
+                    );
                 } catch (e) { console.error('Notify student error:', e); }
             })();
         }
@@ -394,7 +379,6 @@ export const assignmentService = {
 
         // Notify class members about new note/announcement
         if (!error && data) {
-            RealtimeManager.broadcast('class_feed_posts', 'INSERT', { ...data, class_id: classId });
             notificationService.notifyClassMembers(
                 classId,
                 user.id,
@@ -419,8 +403,6 @@ export const assignmentService = {
             .select()
             .single();
 
-        if (!error && data) RealtimeManager.broadcast('class_feed_posts', 'UPDATE', data);
-
         return { data, error };
     },
 
@@ -431,8 +413,6 @@ export const assignmentService = {
             .from('class_notes')
             .delete()
             .eq('id', noteId);
-
-        if (!error) RealtimeManager.broadcast('class_feed_posts', 'DELETE', { id: noteId });
 
         return { error };
     },

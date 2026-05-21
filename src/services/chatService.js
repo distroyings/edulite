@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import { storageService } from './storageService.js';
-import { RealtimeManager, realtimeManager, generateUUID } from '../lib/RealtimeManager.js';
+import { realtimeManager, generateUUID } from '../lib/RealtimeManager.js';
 
 export const chatService = {
     async searchUsers(query) {
@@ -53,12 +53,15 @@ export const chatService = {
                         .select('id, name, avatar_url, banner_url, chat_enabled')
                         .in('id', classIds)
                     : { data: [] },
-                // Get last messages for all chats using a lateral join approach
-                // We fetch the 1 most recent message per chat
+                // Last-message preview per chat. We fetch the most recent N rows
+                // across all chats and let the Map dedup keep the first per chat.
+                // Bounded by .limit() so the payload stays predictable on busy
+                // accounts. Older chats may show no preview until the user opens them.
                 supabase.from('messages')
                     .select('chat_id, content, created_at, sender_id')
                     .in('chat_id', chatIds)
                     .order('created_at', { ascending: false })
+                    .limit(500)
             ]);
 
             // Build lookup maps
@@ -187,8 +190,12 @@ export const chatService = {
                 ]);
 
             if (memberError) {
-                // Best-effort cleanup (may fail if no DELETE policy, that's OK)
-                await supabase.from('chats').delete().eq('id', chatId).catch(() => { });
+                // Best-effort cleanup. If this fails (e.g. no DELETE policy),
+                // the chat row is orphaned — log it so we can find it later.
+                const { error: cleanupError } = await supabase.from('chats').delete().eq('id', chatId);
+                if (cleanupError) {
+                    console.warn('createChat: orphaned chat row after member-insert failure', { chatId, cleanupError, memberError });
+                }
                 return { error: memberError };
             }
 
@@ -199,9 +206,13 @@ export const chatService = {
         }
     },
 
-    async getMessages(chatId) {
+    async getMessages(chatId, limit = 100) {
         if (!supabase) return { data: [], error: null };
 
+        // Fetch the NEWEST `limit` messages (descending), then flip them
+        // back to chronological order for the caller. Ordering ascending
+        // + limit returned the OLDEST N, which meant new messages were
+        // invisible once a chat passed `limit` total messages.
         const { data, error } = await supabase
             .from('messages')
             .select(`
@@ -215,35 +226,11 @@ export const chatService = {
                 )
             `)
             .eq('chat_id', chatId)
-            .order('created_at', { ascending: true })
-            .limit(100);
+            .order('created_at', { ascending: false })
+            .limit(limit);
 
-        return { data, error };
-    },
-
-    async _broadcastToChat(chatId, eventName, payloadData) {
-        if (!supabase) return;
-        try {
-            const topic = `chat-live:${chatId}`;
-            let chan = supabase.channel(topic);
-            let isSubscribed = false;
-            chan.subscribe((status) => { if (status === 'SUBSCRIBED') isSubscribed = true; });
-            
-            await new Promise(resolve => {
-                let attempt = 0;
-                const check = setInterval(() => {
-                    if (isSubscribed || attempt > 40) {
-                        clearInterval(check);
-                        resolve();
-                    }
-                    attempt++;
-                }, 50);
-            });
-
-            if (isSubscribed) {
-                chan.send({ type: 'broadcast', event: eventName, payload: payloadData });
-            }
-        } catch (e) { console.error('Chat broadcast error:', e); }
+        if (error) return { data: [], error };
+        return { data: (data || []).reverse(), error: null };
     },
 
     async sendMessage(chatId, content, fileUrl = null, replyToId = null) {
@@ -258,50 +245,56 @@ export const chatService = {
         if (fileUrl) payload.file_url = fileUrl;
         if (replyToId) payload.reply_to_id = replyToId;
 
-        // Select with joins so broadcast includes full profile + reply data
+        // Insert with joined profile + reply data so the optimistic
+        // promotion has everything it needs without a follow-up fetch.
+        // The DB write itself fans out to all subscribers (chat thread
+        // and sidebar) via the supabase_realtime publication.
         const { data, error } = await supabase
             .from('messages')
             .insert(payload)
             .select('*, profiles:sender_id(name, avatar_url, username, is_verified), parent:reply_to_id(content, sender_id, profiles:sender_id(name))')
             .single();
 
-        // Broadcast enriched message for instant delivery
-        if (data) {
-            await this._broadcastToChat(chatId, 'new_message', data);
-            // 2. Broadcast via RealtimeManager for sidebar updates (no REST fallback warning)
-            await RealtimeManager.broadcast('messages', 'INSERT', { chat_id: chatId, content, sender_id: user.id, created_at: data.created_at });
-        }
-
         return { data, error };
     },
 
+    /**
+     * Subscribe to live changes on a chat's messages via Postgres CDC.
+     *
+     * Uses supabase_realtime publication (must include public.messages —
+     * see create_all.sql). CDC is server-side guaranteed delivery, unlike
+     * the old per-message Broadcast which silently dropped events when the
+     * subscriber's channel hit a transient state.
+     *
+     * CDC payloads are the raw row only (no joined profiles). The caller's
+     * onInsert should already handle the `!newMsg.profiles` case with a
+     * lookup — see ChatWindow.
+     */
     subscribeToChat(chatId, { onInsert, onUpdate, onDelete } = {}) {
         if (!supabase) return null;
 
-        // Use Broadcast for realtime — no DB replication needed
-        const channel = supabase.channel(`chat-live:${chatId}`);
+        const channel = supabase.channel(`chat-msgs:${chatId}`);
+        const filter = `chat_id=eq.${chatId}`;
 
         if (onInsert) {
-            channel.on('broadcast', { event: 'new_message' }, ({ payload }) => {
-                onInsert(payload);
-            });
+            channel.on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages', filter },
+                (payload) => { onInsert(payload.new); });
         }
 
         if (onUpdate) {
-            channel.on('broadcast', { event: 'message_updated' }, ({ payload }) => {
-                onUpdate(payload);
-            });
+            channel.on('postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'messages', filter },
+                (payload) => { onUpdate(payload.new); });
         }
 
         if (onDelete) {
-            channel.on('broadcast', { event: 'message_deleted' }, ({ payload }) => {
-                onDelete(payload);
-            });
+            channel.on('postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'messages', filter },
+                (payload) => { onDelete(payload.old); });
         }
 
-        return channel.subscribe((status) => {
-            console.log(`[Chat RT] ${chatId} subscription: ${status}`);
-        });
+        return channel.subscribe();
     },
 
     async deleteMessage(messageId) {
@@ -343,11 +336,8 @@ export const chatService = {
             .select()
             .single();
 
-        // Broadcast the update for instant UI change on other clients
-        if (result.data) {
-            await this._broadcastToChat(msg.chat_id, 'message_updated', result.data);
-        }
-
+        // No manual broadcast — the DB UPDATE flows to subscribers via
+        // the supabase_realtime publication (postgres_changes/UPDATE).
         return result;
     },
 
@@ -389,8 +379,10 @@ export const chatService = {
 
     /**
      * Subscribe to sidebar-level chat updates (new messages arriving in any chat).
-     * Uses RealtimeManager's global broadcast channel.
-     * @param {Function} callback - Called when any message INSERT is broadcast
+     * Backed by Postgres CDC via RealtimeManager. Server-side RLS on the
+     * messages table ensures we only receive INSERT events for chats the
+     * current user is a member of.
+     * @param {Function} callback - Called with the inserted row.
      * @returns {void} - Cleanup via realtimeManager.unsubscribe('sidebar:messages')
      */
     subscribeToChatUpdates(callback) {

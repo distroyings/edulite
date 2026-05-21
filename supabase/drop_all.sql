@@ -41,7 +41,12 @@ DROP TABLE IF EXISTS public.class_members CASCADE;
 DROP TABLE IF EXISTS public.classes CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- Functions
+-- Functions (both public and private schemas)
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.generate_invite_code() CASCADE;
 DROP FUNCTION IF EXISTS public.is_chat_member(uuid) CASCADE;
+DROP FUNCTION IF EXISTS private.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS private.is_chat_member(uuid) CASCADE;
+
+-- Private schema (recreated by create_all.sql)
+DROP SCHEMA IF EXISTS private CASCADE;

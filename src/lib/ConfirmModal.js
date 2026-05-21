@@ -1,4 +1,5 @@
 import { Modal } from '../components/Modal.js';
+import { escapeHtml } from './utils.js';
 
 export function ConfirmModal({ title, message, confirmText = 'Confirmar', cancelText = 'Cancelar', isDanger = false, onConfirm }) {
     const container = document.createElement('div');
@@ -17,16 +18,16 @@ export function ConfirmModal({ title, message, confirmText = 'Confirmar', cancel
             : `<svg class="w-8 h-8 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
         }
         </div>
-        
-        <h3 class="text-2xl font-black text-primary mb-2">${title}</h3>
-        <p class="text-muted mb-8 leading-relaxed max-w-sm">${message}</p>
-        
+
+        <h3 class="text-2xl font-black text-primary mb-2">${escapeHtml(String(title ?? ''))}</h3>
+        <p class="text-muted mb-8 leading-relaxed max-w-sm">${escapeHtml(String(message ?? ''))}</p>
+
         <div class="flex gap-3 w-full">
             <button id="confirm-cancel-btn" class="flex-1 px-6 py-3 rounded-xl border border-border dark:border-white/10 text-primary font-bold hover:bg-surface dark:hover:bg-white/5 transition-colors">
-                ${cancelText}
+                ${escapeHtml(String(cancelText))}
             </button>
             <button id="confirm-ok-btn" class="flex-1 px-6 py-3 rounded-xl font-black shadow-lg transition-transform hover:scale-[1.02] active:scale-95 ${buttonClass}">
-                ${confirmText}
+                ${escapeHtml(String(confirmText))}
             </button>
         </div>
     `;
@@ -38,16 +39,20 @@ export function ConfirmModal({ title, message, confirmText = 'Confirmar', cancel
     };
 
     container.querySelector('#confirm-ok-btn').onclick = async () => {
-        // Show loading state
         const btn = container.querySelector('#confirm-ok-btn');
         const originalText = btn.textContent;
         btn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
         btn.disabled = true;
 
-        if (onConfirm) {
-            await onConfirm();
+        try {
+            if (onConfirm) await onConfirm();
+            modal.close();
+        } catch (e) {
+            // Restore the button so the user can retry or cancel.
+            console.error('ConfirmModal: onConfirm threw', e);
+            btn.disabled = false;
+            btn.textContent = originalText;
         }
-        modal.close();
     };
 
     modal.open();

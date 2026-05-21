@@ -161,14 +161,14 @@ export function SubmissionsListModal(assignmentId, assignmentData = {}) {
                     <input type="number" min="0" max="${maxGrade}" step="0.5" placeholder="—"
                         value="${isGraded ? sub.grade : ''}"
                         data-sub-id="${sub.id}"
-                        class="grade-input w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary font-bold text-center text-sm focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        class="grade-input w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary font-bold text-center text-sm focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                 </div>
                 <div class="flex-1">
                     <label class="text-[8px] font-bold text-muted uppercase block mb-0.5">Feedback</label>
                     <input type="text" placeholder="Comentário..." maxlength="300"
                         value="${sub.feedback || ''}"
-                        class="feedback-input w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary text-xs focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-all"
+                        class="feedback-input w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-background dark:bg-white/5 text-primary text-xs focus:border-neon focus:ring-1 focus:ring-neon/30 outline-none transition-colors"
                     />
                 </div>
                 <button data-sub-id="${sub.id}" class="save-grade-btn px-3 py-1.5 rounded-lg bg-neon text-white font-bold text-[11px] hover:opacity-90 transition-all whitespace-nowrap">

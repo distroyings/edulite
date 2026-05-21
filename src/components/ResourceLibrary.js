@@ -70,7 +70,7 @@ export function ResourceLibrary(classId, container, isOwner) {
                 <div class="relative flex-1">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">${ICONS.search}</span>
                     <input type="text" id="rl-search" placeholder="Pesquisar materiais..." value="${escapeHtml(searchQuery)}"
-                        class="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                        class="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                 </div>
                 ${isOwner ? `
                     <button id="rl-add-btn" class="flex-shrink-0 flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-neon to-emerald-500 text-black text-xs font-bold hover:shadow-lg hover:shadow-neon/25 transition-all active:scale-95">
@@ -258,13 +258,13 @@ export function ResourceLibrary(classId, container, isOwner) {
                     <div>
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">Título ${selectedFiles.length > 1 || linkUrls.filter(u => u).length > 1 ? '<span class="normal-case font-normal">(usa nome do ficheiro se vazio)</span>' : '*'}</label>
                         <input type="text" id="rl-title" placeholder="Ex: Slides da aula 5" maxlength="100"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
 
                     <div>
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">Descrição</label>
                         <input type="text" id="rl-desc" placeholder="Breve descrição (opcional)" maxlength="300"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
 
                     <!-- Link/Video URLs (multi) -->
@@ -277,7 +277,7 @@ export function ResourceLibrary(classId, container, isOwner) {
                         <div class="space-y-2" id="rl-url-list">
                             ${linkUrls.map((url, i) => `
                                 <div class="flex items-center gap-2">
-                                    <input type="url" class="rl-url-input flex-1 h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all"
+                                    <input type="url" class="rl-url-input flex-1 h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors"
                                         placeholder="https://..." maxlength="500" value="${escapeHtml(url)}" data-idx="${i}">
                                     ${linkUrls.length > 1 ? `<button class="rl-remove-url p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90 flex-shrink-0" data-idx="${i}">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -322,7 +322,7 @@ export function ResourceLibrary(classId, container, isOwner) {
                     <div>
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">Pasta</label>
                         <input type="text" id="rl-folder" placeholder="Geral" value="Geral" maxlength="50"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02]">
@@ -469,14 +469,16 @@ export function ResourceLibrary(classId, container, isOwner) {
                     saveBtn.textContent = total > 1 ? `A enviar ${i + 1}/${total}...` : 'A guardar...';
 
                     let fileUrl = item.fileUrl || null;
+                    let uploadedPath = null;
                     if (item.file) {
-                        const { url, error } = await resourceService.uploadFile(classId, item.file);
+                        const { url, path, error } = await resourceService.uploadFile(classId, item.file);
                         if (error) {
                             Notification.error(`Erro "${item.file.name}": ${error.message}`);
                             errors++;
                             continue;
                         }
                         fileUrl = url;
+                        uploadedPath = path;
                     }
 
                     const { error } = await resourceService.addResource(classId, {
@@ -490,6 +492,8 @@ export function ResourceLibrary(classId, container, isOwner) {
 
                     if (error) {
                         Notification.error(error.message);
+                        // Clean up the freshly-uploaded file so it doesn't orphan in storage.
+                        if (uploadedPath) await resourceService.deleteUploadedFile(uploadedPath);
                         errors++;
                     }
                 }
@@ -549,20 +553,20 @@ export function ResourceLibrary(classId, container, isOwner) {
                     <div>
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">Título *</label>
                         <input type="text" id="rle-title" value="${escapeHtml(resource.title || '')}" maxlength="100"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
 
                     <div>
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">Descrição</label>
                         <input type="text" id="rle-desc" value="${escapeHtml(resource.description || '')}" placeholder="Breve descrição (opcional)" maxlength="300"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
 
                     <!-- Link URL -->
                     <div id="rle-link-field" class="${isLinkType ? '' : 'hidden'}">
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">URL</label>
                         <input type="url" id="rle-url" value="${escapeHtml(resource.link_url || '')}" placeholder="https://..." maxlength="500"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
 
                     <!-- File upload (re-upload) -->
@@ -581,7 +585,7 @@ export function ResourceLibrary(classId, container, isOwner) {
                     <div>
                         <label class="text-[11px] font-bold text-muted uppercase tracking-wider mb-1 block">Pasta</label>
                         <input type="text" id="rle-folder" value="${escapeHtml(resource.folder || 'Geral')}" maxlength="50"
-                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-all">
+                            class="w-full h-10 px-4 text-sm rounded-xl bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/30 focus:ring-2 focus:ring-neon/10 text-primary placeholder:text-gray-400 focus:outline-none transition-colors">
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02]">

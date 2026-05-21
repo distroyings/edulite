@@ -4,6 +4,8 @@ export class Modal {
 
         this.overlay = document.createElement('div');
         this.overlay.className = 'fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center opacity-0 transition-opacity duration-300';
+        this.overlay.setAttribute('role', 'dialog');
+        this.overlay.setAttribute('aria-modal', 'true');
 
         this.container = document.createElement('div');
         this.container.className = `glass-panel p-0 rounded-3xl w-full ${maxWidth} mx-4 transform scale-90 opacity-0 transition-all duration-300 shadow-2xl border border-white/10 relative overflow-hidden flex flex-col`;
@@ -24,8 +26,11 @@ export class Modal {
         // BETTER: Use `p-8` for more spacious look, OR consistent `p-6`.
         // I will just change maxWidth.
 
-        // Use CSS class for glass effect to support both Light and Dark modes properly
-        this.container.className = `glass-panel p-4 sm:p-6 md:p-8 rounded-[2rem] w-full ${maxWidth} mx-2 sm:mx-4 transform scale-90 opacity-0 transition-all duration-300 relative overflow-y-auto flex flex-col max-h-[85vh] sm:max-h-[90vh]`;
+        // Use CSS class for glass effect to support both Light and Dark modes properly.
+        // overflow-x-hidden is explicit because `overflow-y-auto` alone makes
+        // browsers promote overflow-x to `auto`, which lets ring outlines /
+        // 1-2px rounding errors leak past the rounded modal edge.
+        this.container.className = `glass-panel p-4 sm:p-6 md:p-8 rounded-[2rem] w-full ${maxWidth} mx-2 sm:mx-4 transform scale-90 opacity-0 transition-all duration-300 relative overflow-y-auto overflow-x-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]`;
 
         if (typeof content === 'string') {
             this.container.innerHTML = content;
@@ -36,6 +41,7 @@ export class Modal {
         // Close Button (Theme-Aware)
         const closeBtn = document.createElement('button');
         closeBtn.className = 'modal-close-btn absolute top-5 right-5 z-50';
+        closeBtn.setAttribute('aria-label', 'Fechar');
         closeBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>`;
         closeBtn.onclick = () => this.close();
         this.container.appendChild(closeBtn);

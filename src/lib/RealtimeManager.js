@@ -5,7 +5,6 @@ export function generateUUID() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
     }
-    // Fallback for HTTP or older browsers
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = (Math.random() * 16) | 0;
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
@@ -13,151 +12,92 @@ export function generateUUID() {
 }
 
 /**
- * RealtimeManager — Broadcast-based real-time subscription manager.
- * 
- * Uses a single Supabase Broadcast channel for ALL data change events.
- * No dependency on Postgres Replication — works instantly out of the box.
- * 
- * Usage:
- *   // Subscribe (same API as before)
+ * RealtimeManager — Postgres CDC subscription manager.
+ *
+ * Each subscribe() creates a dedicated supabase channel that listens for
+ * `postgres_changes` events on the target table. The underlying WebSocket
+ * connection is shared across channels by the supabase client, so the
+ * per-key channel overhead is just protocol-level state.
+ *
  *   realtimeManager.subscribe('class:123:assignments', 'assignments',
  *     { column: 'class_id', value: '123' },
  *     ['INSERT', 'UPDATE', 'DELETE'],
  *     (payload) => { ... }
  *   );
- *   
- *   // Broadcast from services after mutations
- *   RealtimeManager.broadcast('assignments', 'INSERT', { class_id: '123', ... });
- *   
- *   // Cleanup
+ *   realtimeManager.unsubscribe('class:123:assignments');
  *   realtimeManager.unsubscribeByPrefix('class:123');
  *   realtimeManager.cleanup();
+ *
+ * Tables MUST be part of the `supabase_realtime` publication — see
+ * create_all.sql `ALTER PUBLICATION supabase_realtime ADD TABLE ...`.
+ *
+ * Writers do NOT need to broadcast anything after a mutation; Postgres
+ * delivers the INSERT/UPDATE/DELETE event to all subscribers itself.
  */
 class RealtimeManager {
     constructor() {
-        /** @type {Map<string, { table: string, filter: string|null, events: string[], callback: Function }>} */
+        /** @type {Map<string, { channel: import('@supabase/supabase-js').RealtimeChannel, table: string }>} */
         this.subscriptions = new Map();
-        /** @type {import('@supabase/supabase-js').RealtimeChannel|null} */
-        this.channel = null;
-    }
-
-    /** Lazily create the single global broadcast channel */
-    _ensureChannel() {
-        if (this.channel || !supabase) return;
-
-        this.channelStatus = 'JOINING';
-        this.channel = supabase.channel('data-changes');
-        
-        this.channel.on('broadcast', { event: 'change' }, ({ payload }) => {
-            if (!payload) return;
-            const { table, event, data } = payload;
-
-            for (const [, sub] of this.subscriptions) {
-                if (sub.table !== table) continue;
-                if (!sub.events.includes(event)) continue;
-                if (sub.filter) {
-                    const match = sub.filter.match(/^(.+?)=eq\.(.+)$/);
-                    if (match) {
-                        const [, col, val] = match;
-                        if (data && String(data[col]) !== String(val)) continue;
-                    }
-                }
-                try { sub.callback(payload); } catch (e) { console.error('[RT] callback error:', e); }
-            }
-        });
-
-        this.channel.subscribe((status) => {
-            this.channelStatus = status;
-            if (status === 'SUBSCRIBED') {
-                console.log('[RT] ✅ Global broadcast channel connected');
-            } else if (status === 'CHANNEL_ERROR') {
-                console.warn('[RT] ❌ Global channel error');
-            }
-        });
-    }
-
-    async _waitForConnection() {
-        if (!this.channel) return;
-        if (this.channelStatus === 'SUBSCRIBED') return;
-        return new Promise(resolve => {
-            let attempt = 0;
-            const check = setInterval(() => {
-                if (this.channelStatus === 'SUBSCRIBED' || attempt > 40) { // Max 2 seconds timeout
-                    clearInterval(check);
-                    resolve();
-                }
-                attempt++;
-            }, 50);
-        });
     }
 
     /**
-     * Subscribe to data changes. Filter is applied client-side.
+     * Subscribe to data changes via Postgres CDC.
+     *
      * @param {string} key - Unique subscription key
-     * @param {string} table - Table name to listen for
-     * @param {string|null} filter - Optional filter like 'class_id=eq.xxx' (applied client-side)
-     * @param {string[]} events - Events: 'INSERT', 'UPDATE', 'DELETE'
-     * @param {(payload: any) => void} callback
+     * @param {string} table - Table name (must be in supabase_realtime publication)
+     * @param {{column: string, value: any}|null} filter - Equality filter, or null for all rows
+     * @param {Array<'INSERT'|'UPDATE'|'DELETE'>} events
+     * @param {(payload: { table: string, event: string, data: any }) => void} callback
      */
     subscribe(key, table, filter, events, callback) {
-        if (!supabase) return;
+        if (!supabase || !table || !Array.isArray(events) || events.length === 0) return;
+
+        // Replace any previous subscription with the same key.
         this.unsubscribe(key);
-        this._ensureChannel();
-        this.subscriptions.set(key, { table, filter, events, callback });
-        console.log(`[RT] ✅ ${key}`);
+
+        const filterStr = filter && filter.column && filter.value !== undefined
+            ? `${filter.column}=eq.${filter.value}`
+            : undefined;
+
+        // A unique channel name per key avoids accidental sharing if the
+        // same key is re-registered after a re-mount.
+        const channel = supabase.channel(`rt:${key}:${generateUUID()}`);
+
+        events.forEach(event => {
+            const opts = { event, schema: 'public', table };
+            if (filterStr) opts.filter = filterStr;
+            channel.on('postgres_changes', opts, (payload) => {
+                const data = payload.eventType === 'DELETE' ? payload.old : payload.new;
+                try {
+                    callback({ table, event: payload.eventType, data });
+                } catch (e) {
+                    console.error(`[RT] callback error in ${key}:`, e);
+                }
+            });
+        });
+
+        channel.subscribe();
+        this.subscriptions.set(key, { channel, table });
     }
 
-    /**
-     * Broadcast a data change to all subscribers.
-     * Call this from services after any mutation.
-     * Uses the singleton's channel to avoid creating duplicate channels.
-     * @param {string} table - Table name
-     * @param {string} event - 'INSERT', 'UPDATE', or 'DELETE'
-     * @param {object} data - The row data (should include filter fields like class_id)
-     */
-    static async broadcast(table, event, data = {}) {
-        if (!supabase) return;
-        try {
-            const mgr = realtimeManager;
-            mgr._ensureChannel();
-            await mgr._waitForConnection();
-            if (mgr.channel && mgr.channelStatus === 'SUBSCRIBED') {
-                mgr.channel.send({
-                    type: 'broadcast',
-                    event: 'change',
-                    payload: { table, event, data }
-                });
-            }
-        } catch (e) { console.error('[RT] broadcast error:', e); }
-    }
-
-    /** Unsubscribe a specific key */
+    /** Unsubscribe a specific key — tears down the underlying channel. */
     unsubscribe(key) {
-        if (this.subscriptions.delete(key)) {
-            console.log(`[RT] 🔌 ${key}`);
-        }
+        const sub = this.subscriptions.get(key);
+        if (!sub) return;
+        try { supabase.removeChannel(sub.channel); } catch { /* ignore */ }
+        this.subscriptions.delete(key);
     }
 
-    /** Unsubscribe all keys starting with prefix */
+    /** Unsubscribe all keys starting with prefix (e.g. `class:abc:`). */
     unsubscribeByPrefix(prefix) {
         for (const key of [...this.subscriptions.keys()]) {
-            if (key.startsWith(prefix)) {
-                this.subscriptions.delete(key);
-                console.log(`[RT] 🔌 ${key}`);
-            }
+            if (key.startsWith(prefix)) this.unsubscribe(key);
         }
     }
 
-    /** Cleanup everything */
+    /** Tear down every active subscription. */
     cleanup() {
-        for (const key of this.subscriptions.keys()) {
-            console.log(`[RT] 🧹 ${key}`);
-        }
-        this.subscriptions.clear();
-        if (this.channel) {
-            supabase.removeChannel(this.channel);
-            this.channel = null;
-        }
+        for (const key of [...this.subscriptions.keys()]) this.unsubscribe(key);
     }
 
     get activeCount() {
@@ -166,4 +106,3 @@ class RealtimeManager {
 }
 
 export const realtimeManager = new RealtimeManager();
-export { RealtimeManager };

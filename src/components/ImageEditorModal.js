@@ -44,8 +44,20 @@ export function ImageEditorModal(file, aspectRatio, onSave) {
         </div>
     `;
 
-    // Create modal
-    const modal = new Modal(container);
+    // Track resources so we can clean up on close.
+    const abort = new AbortController();
+    const signal = abort.signal;
+    let modalClosed = false;
+    const cleanup = () => {
+        if (modalClosed) return;
+        modalClosed = true;
+        abort.abort();
+        try { URL.revokeObjectURL(objectUrl); } catch { /* ignore */ }
+    };
+
+    // Create modal — onClose runs the cleanup whether the user cancelled,
+    // saved, or closed via the X button.
+    const modal = new Modal(container, cleanup);
 
     // Logic
     const img = container.querySelector('#source-image');
@@ -148,41 +160,42 @@ export function ImageEditorModal(file, aspectRatio, onSave) {
     };
 
     // ── Pan ──
-    cropArea.onmousedown = (e) => {
+    // Use addEventListener + AbortController so handlers are scoped to this
+    // modal and removed on close. Previous code assigned to `window.on*`,
+    // which clobbered other listeners and never got torn down.
+    cropArea.addEventListener('mousedown', (e) => {
         e.preventDefault();
         state.panning = true;
         state.startX = e.clientX - state.x;
         state.startY = e.clientY - state.y;
-    };
+    }, { signal });
 
-    cropArea.ontouchstart = (e) => {
-        // prevent scroll
+    cropArea.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1) {
             state.panning = true;
             state.startX = e.touches[0].clientX - state.x;
             state.startY = e.touches[0].clientY - state.y;
         }
-    };
+    }, { signal, passive: true });
 
-    window.onmousemove = (e) => {
+    window.addEventListener('mousemove', (e) => {
         if (!state.panning) return;
         e.preventDefault();
         state.x = e.clientX - state.startX;
         state.y = e.clientY - state.startY;
         updateTransform();
-    };
+    }, { signal });
 
-    window.ontouchmove = (e) => {
+    window.addEventListener('touchmove', (e) => {
         if (!state.panning) return;
-        // e.preventDefault(); // can block scroll
         state.x = e.touches[0].clientX - state.startX;
         state.y = e.touches[0].clientY - state.startY;
         updateTransform();
-    };
+    }, { signal, passive: true });
 
     const stopPan = () => { state.panning = false; };
-    window.onmouseup = stopPan;
-    window.ontouchend = stopPan;
+    window.addEventListener('mouseup', stopPan, { signal });
+    window.addEventListener('touchend', stopPan, { signal });
 
     // ── Save ──
     saveBtn.onclick = async () => {

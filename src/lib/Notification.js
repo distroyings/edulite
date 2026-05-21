@@ -1,3 +1,5 @@
+import { escapeHtml } from './utils.js';
+
 export const Notification = {
     container: null,
 
@@ -28,7 +30,7 @@ export const Notification = {
 
         toast.innerHTML = `
             ${icons[type] || icons.info}
-            <span class="text-sm font-medium text-primary">${message}</span>
+            <span class="text-sm font-medium text-primary">${escapeHtml(String(message ?? ''))}</span>
         `;
 
         this.container.appendChild(toast);

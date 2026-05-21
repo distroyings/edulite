@@ -110,7 +110,7 @@ export async function ProfilePage() {
         <!--Banner -->
         <div class="h-[140px] sm:h-[180px] relative w-full" id="banner-area">
             ${profile.banner_url
-            ? `<img src="${profile.banner_url}" id="banner-img" class="w-full h-full object-cover">`
+            ? `<img src="${profile.banner_url}" id="banner-img" alt="" class="w-full h-full object-cover">`
             : `<div class="w-full h-full bg-gradient-to-r from-blue-500/40 to-purple-600/40 pf-banner-pattern" id="banner-img-placeholder"></div><div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent opacity-80 pf-banner-gradient"></div>`
         }
             ${isOwner ? `<button id="edit-banner-btn" class="absolute top-4 right-4 p-2 rounded-xl bg-black/40 text-white backdrop-blur-md hover:bg-black/60 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button><input type="file" id="banner-file-input" class="hidden" accept="image/*">` : ''}
@@ -260,9 +260,12 @@ export async function ProfilePage() {
                         optionsModal.remove();
                         if (!confirm('Remover a foto de perfil?')) return;
                         await profileService.updateProfile(currentUser.id, { avatar_url: null });
+                        // Also remove the underlying storage object so the bucket
+                        // doesn't keep an orphaned file behind.
+                        try {
+                            await supabase.storage.from('avatars').remove([`${currentUser.id}.webp`]);
+                        } catch (e) { console.warn('Avatar storage cleanup failed', e); }
 
-                        // Replace img with letter div
-                        const initial = (currentUser.name || 'U')[0];
                         // Replace img with letter div using getAvatar
                         const newHtml = getAvatar(null, currentUser.name, 'w-full h-full', 'rounded-[2.5rem]', 'profile-avatar');
                         if (currentAvatar) {
@@ -368,6 +371,9 @@ export async function ProfilePage() {
                         optionsModal.remove();
                         if (!confirm('Remover a capa do perfil?')) return;
                         await profileService.updateProfile(currentUser.id, { banner_url: null });
+                        try {
+                            await supabase.storage.from('banners').remove([`${currentUser.id}.webp`]);
+                        } catch (e) { console.warn('Banner storage cleanup failed', e); }
 
                         // Use gradient placeholder
                         const bannerArea = content.querySelector('#banner-area');

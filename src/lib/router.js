@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   Router with route-aware skeleton loading
+   Router with route-aware skeleton loading + page bfcache.
    ═══════════════════════════════════════════════════════════ */
-import { realtimeManager } from './RealtimeManager.js';
 
 /* ── Bone helpers (use .sk class from app.css for shimmer) ── */
 const b = (w, h, extra = '') => `<div class="sk ${extra}" style="width:${w};height:${h}"></div>`;
@@ -28,10 +27,10 @@ const HEADER = `
   </div>
 </div>`;
 
-/* ── Chat item skeleton ── */
+/* ── Chat item skeleton (Telegram-style: 52px round avatar, two-line meta) ── */
 const chatItem = () => `
-<div class="flex items-center gap-3 px-3 py-3 mx-1">
-  ${br('48px')}
+<div class="flex items-center gap-3 px-3 py-2.5 mx-0">
+  ${br('52px')}
   <div class="flex-1 min-w-0 space-y-2">
     <div class="flex items-center justify-between">
       ${b('55%', '13px', 'rounded-md')}
@@ -138,28 +137,43 @@ const SKELETONS = {
       </div>
     </div>`,
 
-  /* ── Messages ── */
+  /* ── Messages (Telegram-style: full-width, round avatars, decorative chat bg) ── */
   messages: `
     ${HEADER}
     <div class="fixed inset-0 flex flex-col bg-background">
       <div style="height:64px;flex-shrink:0"></div>
-      <div class="max-w-[1600px] mx-auto w-full flex flex-1 min-h-0 md:px-6">
+      <div class="w-full flex flex-1 min-h-0">
         <!-- Sidebar -->
-        <div class="w-full md:w-[340px] lg:w-[380px] flex-shrink-0 md:border-r border-gray-200 dark:border-white/10 bg-surface flex flex-col">
-          <div class="px-3.5 pt-3.5 pb-2">
-            <div class="flex items-center gap-2.5">
-              ${b('100%', '40px', 'rounded-xl')}
-              ${b('40px', '40px', 'rounded-xl flex-shrink-0')}
+        <div class="w-full md:w-[320px] lg:w-[380px] flex-shrink-0 md:border-r border-black/5 dark:border-white/[0.06] bg-surface flex flex-col">
+          <div class="px-3 pt-3 pb-2">
+            <div class="flex items-center gap-2">
+              ${b('100%', '40px', 'rounded-full')}
+              ${br('40px')}
             </div>
           </div>
-          <div class="flex-1 px-1.5 space-y-1 overflow-hidden">
+          <div class="flex-1 px-1.5 space-y-0.5 overflow-hidden">
             ${n(8, chatItem)}
           </div>
         </div>
-        <!-- Chat area -->
-        <div class="hidden md:flex flex-1 items-center justify-center">
-          <div class="text-center space-y-4">
-            ${b('240px', '240px', 'rounded-[28px] mx-auto')}
+        <!-- Chat area: mirror the empty-state carousel frame so the
+             skeleton-to-real swap doesn't jump. -->
+        <div class="hidden md:flex flex-1 items-center justify-center tg-chat-bg">
+          <div class="rounded-3xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/5 dark:border-white/[0.06] p-6" style="width:520px;max-width:90vw">
+            <div class="flex items-center gap-4">
+              <!-- Front card placeholder (the visible top card in the stack) -->
+              <div class="flex-1 min-w-0 h-[280px] rounded-2xl bg-black/[0.04] dark:bg-white/[0.05] flex flex-col items-center justify-center gap-5 px-6">
+                ${br('80px', 'rounded-3xl')}
+                <div class="w-full flex flex-col items-center gap-2">
+                  ${b('60%', '16px', 'rounded-md')}
+                  ${b('80%', '12px', 'rounded-md')}
+                  ${b('70%', '12px', 'rounded-md')}
+                </div>
+              </div>
+              <!-- Dots indicator column (5 features → 5 dots) -->
+              <div class="flex flex-col gap-3 px-1">
+                ${n(5, () => '<div class="w-2 h-2 rounded-full bg-black/15 dark:bg-white/15"></div>')}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -378,6 +392,22 @@ export class Router {
     this.app = document.getElementById('app');
     this._initialRouteHandled = false;
 
+    /* ── bfcache-style page cache ────────────────────────────────────
+       Keeps previously-visited pages mounted in the DOM (display:none)
+       so back-navigation is instant — no rebuild, no refetch, scroll
+       position preserved by the browser.
+
+       Keyed by `_routeIdentity` so /messages/abc and /messages/def
+       share one cached MessagesPage that handles the chat swap via
+       its own onRouteUpdate. Capped at `cacheCap` entries, LRU evicted.
+
+       Subscriptions on cached pages stay alive — that's why
+       `realtimeManager.cleanup()` is NOT called between routes anymore.
+       Each page is responsible for its own subscription keys so they
+       don't conflict across pages. */
+    this.pageCache = new Map();
+    this.cacheCap = 5;
+
     // Handle back/forward buttons
     window.addEventListener('popstate', () => this.handleRoute());
 
@@ -464,43 +494,92 @@ export class Router {
       const oldIdentity = this._routeIdentity(this.currentRoute || '');
 
       if (newIdentity !== oldIdentity) {
-        if (this.currentComponent && typeof this.currentComponent.cleanup === 'function') {
-          this.currentComponent.cleanup();
-        }
-        // Clean up all real-time subscriptions
-        realtimeManager.cleanup();
-
-        /* Remove body-mounted navbars on non-guarded (public) routes AND admin routes */
         const isAdminRoute = normalizedPath.startsWith('/admin');
-        if (!route.guard || isAdminRoute) {
+        // Strip the app chrome only when the destination doesn't share it.
+        // Public routes that opt into the app shell (e.g. /changelog) keep
+        // it mounted so there's no header flash on navigation.
+        const stripChrome = (!route.guard && !route.appShell) || isAdminRoute;
+
+        // Hide the previous component instead of nuking it. We only
+        // call cleanup when the cache evicts it later, OR if it's a
+        // public/admin page (we don't cache the landing/login/etc).
+        // NOTE: use a class, not inline `style.display = 'none'`, so we
+        // don't clobber any inline display value the page set itself
+        // (e.g. MessagesPage uses display:flex via Object.assign).
+        if (this.currentComponent) {
+          if (this._isCacheable(this.currentRoute, this.routes)) {
+            this.currentComponent.classList.add('route-hidden');
+            if (typeof this.currentComponent.onPageHide === 'function') {
+              try { this.currentComponent.onPageHide(); } catch (e) { console.error('onPageHide:', e); }
+            }
+          } else {
+            this._discardComponent(this.currentComponent);
+          }
+        }
+
+        // Routes that don't use the app shell get the persistent navbars
+        // torn down (landing, docs, login, signup, admin).
+        if (stripChrome) {
           document.getElementById('app-header')?.remove();
           document.getElementById('mobile-bottom-nav')?.remove();
         }
 
-        /* Show skeleton immediately */
-        this.app.innerHTML = '';
+        // ── Cache hit: restore the previously-mounted page instantly ──
+        const cached = this.pageCache.get(newIdentity);
+        if (cached) {
+          // If the cached node was detached from the DOM (e.g. a previous
+          // 404 wiped it), re-attach it before showing.
+          if (!cached.component.parentNode) this.app.appendChild(cached.component);
+          cached.component.classList.remove('route-hidden');
+          // Bump in LRU order
+          this.pageCache.delete(newIdentity);
+          this.pageCache.set(newIdentity, cached);
+          this.currentComponent = cached.component;
+          this.currentRoute = normalizedPath;
+          // Re-sync the body-mounted header's active link to this route.
+          this._refreshHeader();
+          if (typeof cached.component.onPageShow === 'function') {
+            try { cached.component.onPageShow(); } catch (e) { console.error('onPageShow:', e); }
+          }
+          // If the path differs from when the page was cached, let it know.
+          if (cached.lastPath !== normalizedPath && typeof cached.component.onRouteUpdate === 'function') {
+            try { cached.component.onRouteUpdate(normalizedPath, params); } catch (e) { console.error('onRouteUpdate:', e); }
+          }
+          cached.lastPath = normalizedPath;
+          this._applyAnchor();
+          return;
+        }
+
+        // ── Cache miss: show skeleton, fetch, mount, cache ──
         this._showSkeleton(normalizedPath);
 
-        /* Load the real page */
         try {
           const component = await route.component(...params);
 
-          /* Fade out skeleton → show real content */
+          // Fade out skeleton → reveal real content
           const skel = this.app.querySelector('.route-skeleton');
           if (skel) {
             skel.style.opacity = '0';
             await new Promise(r => setTimeout(r, 180));
+            skel.remove();
           }
 
-          this.app.innerHTML = '';
           if (typeof component === 'string') {
+            // Legacy string components can't be cached; just replace innerHTML.
             this.app.innerHTML = component;
+            this.currentComponent = null;
           } else if (component instanceof HTMLElement) {
             component.classList.add('page-enter');
             this.app.appendChild(component);
+            this.currentComponent = component;
+
+            // Only cache guarded pages with HTMLElement output.
+            if (this._isCacheable(normalizedPath, this.routes, route)) {
+              this.pageCache.set(newIdentity, { component, lastPath: normalizedPath });
+              this._evictOverflow();
+            }
           }
 
-          this.currentComponent = (component instanceof HTMLElement) ? component : null;
           this.currentRoute = normalizedPath;
         } catch (error) {
           console.error('Error loading route component:', error);
@@ -517,23 +596,18 @@ export class Router {
           this.currentRoute = normalizedPath;
         }
 
-        // Handle anchor scrolling
-        const hash = window.location.hash;
-        if (hash) {
-          const id = hash.substring(1);
-          setTimeout(() => {
-            const target = document.getElementById(id);
-            if (target) target.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        }
+        this._applyAnchor();
       } else if (this.currentRoute !== normalizedPath) {
         // Route identity matches but actual path changed (e.g. browser
         // Back/Forward between /class/abc/notes and /class/abc/stream).
         // Notify the component to update its sub-state without remounting.
         this.currentRoute = normalizedPath;
         if (this.currentComponent && typeof this.currentComponent.onRouteUpdate === 'function') {
-          this.currentComponent.onRouteUpdate(normalizedPath, params);
+          try { this.currentComponent.onRouteUpdate(normalizedPath, params); } catch (e) { console.error('onRouteUpdate:', e); }
         }
+        // Keep the cached entry's lastPath in sync.
+        const cachedEntry = this.pageCache.get(newIdentity);
+        if (cachedEntry) cachedEntry.lastPath = normalizedPath;
       }
     } else {
       // 404 Handling
@@ -546,9 +620,21 @@ export class Router {
       document.getElementById('app-header')?.remove();
       document.getElementById('mobile-bottom-nav')?.remove();
 
+      // Hide the previous cached page (don't nuke the cache) so back-nav
+      // from 404 can restore it instantly.
+      if (this.currentComponent && this._isCacheable(this.currentRoute, this.routes)) {
+        this.currentComponent.classList.add('route-hidden');
+      } else if (this.currentComponent) {
+        this._discardComponent(this.currentComponent);
+      }
+      // Remove any previous 404 node before mounting a fresh one.
+      this.app.querySelectorAll('[data-router-404]').forEach(n => n.remove());
+
       const safePath = normalizedPath.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-      this.app.innerHTML = `
+      const notFound = document.createElement('div');
+      notFound.dataset.router404 = '1';
+      notFound.innerHTML = `
         <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black px-4 relative overflow-hidden">
           
           <!-- Background Decoration -->
@@ -594,6 +680,7 @@ export class Router {
           </div>
         </div>
       `;
+      this.app.appendChild(notFound);
 
       this.currentRoute = normalizedPath;
       this.currentComponent = null;
@@ -636,5 +723,113 @@ export class Router {
     el.className = 'route-skeleton min-h-screen bg-background text-foreground';
     el.innerHTML = SKELETONS[key] || SKELETONS.generic;
     this.app.appendChild(el);
+  }
+
+  /* ── Cache helpers ──────────────────────────────────────────── */
+
+  /** Cache only guarded, non-admin routes. Public pages (landing,
+   *  login, signup) are short-lived and shouldn't be kept around. */
+  _isCacheable(path, routes, route = null) {
+    if (!path) return false;
+    if (path.startsWith('/admin')) return false;
+    const r = route || this.matchRoute(path).route;
+    return !!(r && r.guard);
+  }
+
+  /** Tear down a component: cleanup hook + remove from DOM. Also
+   *  drops it from the cache if present. */
+  _discardComponent(component) {
+    if (!component) return;
+    try {
+      if (typeof component.cleanup === 'function') component.cleanup();
+    } catch (e) { console.error('component cleanup:', e); }
+    if (component.parentNode) component.parentNode.removeChild(component);
+    // Drop from cache if it was cached.
+    for (const [k, v] of this.pageCache) {
+      if (v.component === component) { this.pageCache.delete(k); break; }
+    }
+  }
+
+  /** LRU eviction — Map iteration order is insertion order, so the
+   *  first key is the oldest. We re-set on access to bump to newest. */
+  _evictOverflow() {
+    while (this.pageCache.size > this.cacheCap) {
+      const oldestKey = this.pageCache.keys().next().value;
+      const evicted = this.pageCache.get(oldestKey);
+      this.pageCache.delete(oldestKey);
+      if (evicted) this._discardComponent(evicted.component);
+    }
+  }
+
+  /** Smooth-scroll to a #hash target after a route shows. */
+  _applyAnchor() {
+    const hash = window.location.hash;
+    if (!hash) return;
+    const id = hash.substring(1);
+    setTimeout(() => {
+      const target = document.getElementById(id);
+      if (target) target.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  }
+
+  /** Update the active-link class on the existing body-mounted AppHeader
+   *  + mobile bottom nav. Cache restores re-show a page but the header
+   *  was rendered for whatever route was visited last; this re-syncs the
+   *  highlight without rebuilding the header (which would leak subs).
+   *
+   *  Transitions are paused for one frame so the swap doesn't animate
+   *  the brief moment between `bg-white` being added and the dark-variant
+   *  override `dark:bg-white/[0.08]` kicking in — that gap is what
+   *  caused the white-flash in dark mode. */
+  _refreshHeader() {
+    const path = window.location.pathname;
+    const matchActive = (href) => href === path || (href !== '/' && path.startsWith(href));
+
+    const desktopActive = ['bg-white', 'shadow-sm', 'text-black', 'dark:bg-white/[0.08]', 'dark:text-white', 'dark:border', 'dark:border-white/10'];
+
+    const apply = (a, addList, removeList) => {
+      const prev = a.style.transition;
+      a.style.transition = 'none';
+      removeList.forEach(c => a.classList.remove(c));
+      addList.forEach(c => a.classList.add(c));
+      // Force a synchronous reflow so the no-transition style takes effect
+      // before we restore transitions on the next frame.
+      void a.offsetWidth;
+      requestAnimationFrame(() => { a.style.transition = prev; });
+    };
+
+    const header = document.getElementById('app-header');
+    if (header) {
+      header.querySelectorAll('nav a[href]').forEach(a => {
+        const href = a.getAttribute('href');
+        if (!href || !href.startsWith('/')) return;
+        const active = matchActive(href);
+        apply(
+          a,
+          active ? desktopActive : ['text-muted'],
+          active ? ['text-muted'] : desktopActive,
+        );
+      });
+    }
+
+    const mobileNav = document.getElementById('mobile-bottom-nav');
+    if (mobileNav) {
+      mobileNav.querySelectorAll('a[href]').forEach(a => {
+        const href = a.getAttribute('href');
+        if (!href || !href.startsWith('/')) return;
+        const active = matchActive(href);
+        apply(
+          a,
+          active ? ['text-neon'] : ['text-muted'],
+          active ? ['text-muted'] : ['text-neon'],
+        );
+      });
+    }
+  }
+
+  /** Force-evict every cached page (e.g. on logout). */
+  clearCache() {
+    for (const v of this.pageCache.values()) this._discardComponent(v.component);
+    this.pageCache.clear();
   }
 }

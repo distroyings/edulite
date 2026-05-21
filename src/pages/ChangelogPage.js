@@ -39,6 +39,53 @@ export async function ChangelogPage() {
     // --- RELEASES DATA ---
     const releases = [
         {
+            date: '21 Mai 2026',
+            title: 'Realtime CDC, Cache de Páginas & Redesign Completo do Chat',
+            description: 'Reescrita da camada realtime para Postgres CDC (entrega garantida pelo servidor), cache bfcache para navegação instantânea, redesign total da secção de mensagens em estilo Telegram, e dezenas de correções estruturais.',
+            categories: {
+                new: [
+                    'Realtime totalmente baseado em Postgres CDC: o servidor garante a entrega das mensagens e notificações — sem mais eventos perdidos por desconexões silenciosas do canal Broadcast.',
+                    'Page Cache (bfcache estilo browser): voltar a uma página já visitada é instantâneo — DOM, dados e scroll preservados, sem skeleton de carregamento. Limite de 5 páginas em LRU.',
+                    'Confirmação antes de enviar anexos no chat: pré-visualização da imagem ou cartão do ficheiro com legenda opcional, ao estilo WhatsApp/Telegram.',
+                    'Validação client-side de tamanho (10 MB) e tipo de ficheiros nos anexos do chat — feedback imediato antes do upload.',
+                    'Endpoint Edge Function seguro para eliminação de conta: apaga utilizador, dados em cascata e todos os ficheiros de storage em qualquer bucket. JWT validado server-side; impossível eliminar outro utilizador.',
+                    'Contas eliminadas aparecem agora como "Conta Eliminada" nas conversas (em itálico, com avatar cinzento) em vez do nome genérico "Utilizador".',
+                    'Reconciliação automática de mensagens em falta ao voltar ao separador (cobre o raro caso de o canal CDC reconectar depois de uma desconexão).',
+                    '24 emojis de reação rápida no chat (anteriormente 8); fecho ao clicar fora do picker.'
+                ],
+                improvement: [
+                    'Redesign completo da secção de mensagens em estilo Telegram: pill flutuante de cabeçalho e de input, avatares redondos, padrão decorativo de fundo, coluna de mensagens centrada para boa leitura em ecrãs largos.',
+                    'Sidebar de conversas atualiza em-place durante rajadas de mensagens — o input de pesquisa já não perde o texto/cursor a meio da digitação.',
+                    'Promoção otimista de mensagens enviadas: sem glitch, sem flash, sem re-animação quando o servidor confirma — o balão sobe e fica.',
+                    'Reescrita do RealtimeManager para usar postgres_changes internamente — API externa inalterada, todas as páginas (Dashboard, Turmas, Feed, Notificações) beneficiam.',
+                    'Removida toda a chamada manual de RealtimeManager.broadcast(...) nos serviços: o INSERT/UPDATE/DELETE da base de dados é o evento — sem código duplicado.',
+                    'Modal "Criar Nova Turma" redesenhado: separadores Geral/Aparência/Definições distribuídos uniformemente; picker de emoji sempre visível com estado ativo realçado; slider de cor removido (causava overflow).',
+                    'Cabeçalho da navbar preservado ao navegar para o /changelog (rota marcada com appShell: true) — sem flash de remoção/montagem.',
+                    'Botão "Marcar todas como lidas" das notificações bloqueia cliques duplos enquanto a operação está a decorrer.',
+                    'OTP screens (Signup + Forgot Password) com novo ícone de envelope limpo e animação subtil de entrada em vez do bounce infinito.',
+                    'Indicador de "a escrever" removido — feature que adicionava ruído e canais extras de subscrição sem valor proporcional.'
+                ],
+                fix: [
+                    'Mensagens novas não apareciam no histórico do chat: getMessages devolvia as 100 MAIS ANTIGAS por causa de ordenação ascendente + limit. Agora devolve as 100 mais recentes em ordem cronológica.',
+                    'Layout das mensagens partia ao restaurar do cache: style.display = "" removia o display:flex inline definido pelas páginas. Substituído por classe .route-hidden que não toca nos estilos inline.',
+                    'Flash branco nos links da navbar ao clicar: classList.toggle adicionava bg-white antes do override dark:bg-white/[0.08] — agora a troca acontece com transições pausadas e um único reflow.',
+                    'Cartões da carousel da página vazia transparenciavam uns nos outros (opacidade 60%). Agora são totalmente opacos.',
+                    'Separador "Definições" da turma estava completamente vazio: renderSettings() em falta no dispatcher do switchTab.',
+                    'Pill de "A responder" ficava visível 1-2s após enviar a mensagem de texto — agora limpa antes do await do servidor.',
+                    'Erro na eliminação de conta: o cliente chamava um ADMIN_API_URL inexistente em config.js. Substituído pela nova Edge Function delete-account.',
+                    'Ícone do sol no toggle de tema tinha um path SVG quebrado a desenhar um raio fora do viewbox — substituído por Heroicons limpo de 8 raios simétricos.',
+                    'Ícone na verificação de e-mail (Forgot Password) estava disformado e a fazer "bounce" infinito; substituído por um envelope com pop-in subtil de uma só vez.',
+                    'Animação flutuante do tique verde de sucesso na criação de turma removida — ficava a oscilar indefinidamente.',
+                    'Overflow horizontal no modal de criar turma: slider de cor e grelha de emojis a sair da caixa do modal arredondado. Slider removido; defensas overflow-x-hidden e min-w-0 adicionadas a múltiplos níveis.',
+                    'Indicador de seleção do emoji cortado nos cantos da grelha: padding interno adicionado para dar espaço ao ring.',
+                    'Footer do modal "Criar Turma" empurrado para fora quando o conteúdo era longo: adicionado min-h-0 à área de scroll (gotcha clássico de flex column).',
+                    'Estado vazio (carousel de features) nunca aparecia no primeiro carregamento de /messages — adicionado fallback que monta ChatWindow(null) quando nem deep-link nem autoOpenId tenham sido usados.',
+                    'Toasts do chat colidiam com o pill flutuante do input: migrados todos para o sistema global Notification (top-right).',
+                    'Polling de 10 segundos para detectar mensagens em falta removido — substituído por CDC fiável + reconcile-on-visibility.'
+                ]
+            }
+        },
+        {
             date: '18 Abr 2026',
             title: 'Arquitetura de Deep Links & Navegação Instantânea',
             description: 'Restruturação completa do sistema de rotas para suportar deep links, cache de separadores, e navegação instantânea sem remontagem de página.',

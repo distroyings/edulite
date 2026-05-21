@@ -182,11 +182,11 @@ export async function DashboardPage() {
           <div class="space-y-2">
             ${cachedClasses.length === 0 ? '<p class="text-xs text-muted">Nenhuma turma criada.</p>' :
           cachedClasses.slice(0, 4).map(c => `
-                <a href="/class/${c.id}" class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
-                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black" style="background:${c.color || '#6366f1'}">${(c.name || '?')[0].toUpperCase()}</div>
+                <a href="/class/${encodeURIComponent(c.id)}" class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black" style="background:${escapeHtml(c.color || '#6366f1')}">${escapeHtml((c.name || '?')[0].toUpperCase())}</div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-bold text-primary truncate">${c.name}</p>
-                        <p class="text-[9px] text-muted">${c.subject || 'Turma'}</p>
+                        <p class="text-xs font-bold text-primary truncate">${escapeHtml(c.name || '')}</p>
+                        <p class="text-[9px] text-muted">${escapeHtml(c.subject || 'Turma')}</p>
                     </div>
                 </a>
               `).join('')}
@@ -241,10 +241,10 @@ export async function DashboardPage() {
         const pass = parseFloat(a.grade) >= (a.max_grade || 20) / 2;
         return `<div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-white/[0.02]">
                 <div class="flex-1 min-w-0">
-                  <p class="text-[11px] font-bold text-primary truncate">${a.title}</p>
-                  <p class="text-[9px] text-muted">${a.classes?.name || ''}</p>
+                  <p class="text-[11px] font-bold text-primary truncate">${escapeHtml(a.title || '')}</p>
+                  <p class="text-[9px] text-muted">${escapeHtml(a.classes?.name || '')}</p>
                 </div>
-                <span class="text-sm font-black ${pass ? 'text-green-500' : 'text-rose-500'}">${a.grade}<span class="text-[9px] text-muted font-bold">/${a.max_grade || 20}</span></span>
+                <span class="text-sm font-black ${pass ? 'text-green-500' : 'text-rose-500'}">${escapeHtml(String(a.grade))}<span class="text-[9px] text-muted font-bold">/${escapeHtml(String(a.max_grade || 20))}</span></span>
               </div>`;
       }).join('')}
           </div>
@@ -316,11 +316,11 @@ function teacherTaskRow(a, now) {
     else { ts = `${Math.ceil(dh / 24)}d`; urgClass = 'text-muted'; }
   }
   return `
-    <a href="/class/${a.class_id}" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0" style="background:${a.classes?.color || '#6366f1'}">${(a.classes?.name || '?')[0].toUpperCase()}</div>
+    <a href="/class/${encodeURIComponent(a.class_id)}" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0" style="background:${escapeHtml(a.classes?.color || '#6366f1')}">${escapeHtml((a.classes?.name || '?')[0].toUpperCase())}</div>
         <div class="flex-1 min-w-0">
-            <p class="text-xs font-bold text-primary truncate">${a.title}</p>
-            <p class="text-[10px] text-muted">${a.classes?.name || 'Turma'}${a.has_grading ? ' · Avaliável' : ''}</p>
+            <p class="text-xs font-bold text-primary truncate">${escapeHtml(a.title || '')}</p>
+            <p class="text-[10px] text-muted">${escapeHtml(a.classes?.name || 'Turma')}${a.has_grading ? ' · Avaliável' : ''}</p>
         </div>
         <div class="shrink-0 text-right">
             ${ts ? `<p class="text-[11px] font-bold ${urgClass}">${ts}</p>` : ''}
@@ -335,11 +335,11 @@ function studentTaskRow(a, now) {
   const urgent = dh < 24;
   const ts = dh < 1 ? '< 1h' : dh < 24 ? `${dh}h` : `${Math.ceil(dh / 24)}d`;
   return `
-    <a href="/class/${a.class_id}" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0 ${urgent ? 'bg-rose-500' : 'bg-neon'}">${urgent ? '!' : (a.classes?.name || '?')[0].toUpperCase()}</div>
+    <a href="/class/${encodeURIComponent(a.class_id)}" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0 ${urgent ? 'bg-rose-500' : 'bg-neon'}">${urgent ? '!' : escapeHtml((a.classes?.name || '?')[0].toUpperCase())}</div>
         <div class="flex-1 min-w-0">
-            <p class="text-xs font-bold text-primary truncate">${a.title}</p>
-            <p class="text-[10px] text-muted">${a.classes?.name || 'Turma'}</p>
+            <p class="text-xs font-bold text-primary truncate">${escapeHtml(a.title || '')}</p>
+            <p class="text-[10px] text-muted">${escapeHtml(a.classes?.name || 'Turma')}</p>
         </div>
         <div class="shrink-0 text-right">
             <p class="text-[11px] font-bold ${urgent ? 'text-rose-500' : 'text-muted'}">${ts}</p>

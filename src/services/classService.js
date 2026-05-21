@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase.js';
 import { notificationService } from './notificationService.js';
-import { RealtimeManager } from '../lib/RealtimeManager.js';
 
 export const classService = {
     async getClasses() {
@@ -217,9 +216,6 @@ export const classService = {
 
             if (error) return { error };
 
-            // Broadcast for live dashboard updates
-            RealtimeManager.broadcast('class_members', 'INSERT', { class_id: classData.id, user_id: user.id });
-
             // Add to Class Chat
             const { data: chatData } = await supabase
                 .from('chats')
@@ -309,8 +305,6 @@ export const classService = {
             .eq('user_id', userId);
 
         if (!result.error) {
-            RealtimeManager.broadcast('class_members', 'DELETE', { class_id: classId, user_id: userId });
-
             // Also remove kicked user from the class group chat
             const { data: chatData } = await supabase
                 .from('chats')
@@ -373,9 +367,6 @@ export const classService = {
             .eq('user_id', user.id);
 
         if (error) return { error };
-
-        // Broadcast for live dashboard updates
-        RealtimeManager.broadcast('class_members', 'DELETE', { class_id: classId, user_id: user.id });
 
         // Remove from class chat_members too
         const { data: chatData } = await supabase

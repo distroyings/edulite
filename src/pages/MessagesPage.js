@@ -19,9 +19,9 @@ export async function MessagesPage(initialChatId = null) {
 
     container.appendChild(await AppHeader());
 
-    /* ── Centered wrapper matching header's max-w-[1600px] ── */
+    /* ── Full-width wrapper — Telegram-style edge-to-edge layout ── */
     const wrapper = document.createElement('div');
-    wrapper.className = 'max-w-[1600px] mx-auto w-full px-0 md:px-6';
+    wrapper.className = 'w-full';
     Object.assign(wrapper.style, {
         flex: '1',
         display: 'flex',
@@ -64,6 +64,7 @@ export async function MessagesPage(initialChatId = null) {
     let chats = [];
     let isMobile = window.innerWidth < 768;
     let hasUserInteracted = false; // Track if this is the initial deep-link restoration
+    let sidebarComponent = null; // Live ChatSidebar element — used by realtime burst handler to patch in place
 
     const onResize = () => {
         const wasMobile = isMobile;
@@ -107,12 +108,18 @@ export async function MessagesPage(initialChatId = null) {
 
             currentWindow = ChatWindow(null);
             chatContainer.appendChild(currentWindow);
-            renderSidebar();
-            
+            // Active state cleared — patch the sidebar in place instead of
+            // rebuilding (preserves search filter + scroll position).
+            if (sidebarComponent && typeof sidebarComponent.patchChats === 'function') {
+                sidebarComponent.patchChats(chats, null, chatService.getUnreadCounts(chats));
+            } else {
+                renderSidebar();
+            }
+
             // Sync URL
             window.history.replaceState(null, '', '/messages');
             if (window.appRouter) window.appRouter.currentRoute = '/messages';
-            
+
             return;
         }
 
@@ -131,7 +138,13 @@ export async function MessagesPage(initialChatId = null) {
 
         currentWindow = ChatWindow(chat, { onBack: () => loadWindow(null) });
         chatContainer.appendChild(currentWindow);
-        renderSidebar();
+        // Active highlight changed — patch in place so the user's search
+        // filter text and the list scroll position survive.
+        if (sidebarComponent && typeof sidebarComponent.patchChats === 'function') {
+            sidebarComponent.patchChats(chats, chat.id, chatService.getUnreadCounts(chats));
+        } else {
+            renderSidebar();
+        }
 
         // Sync URL — replaceState if this is the initial load from a deep link,
         // pushState for user-initiated chat opens
@@ -172,7 +185,7 @@ export async function MessagesPage(initialChatId = null) {
         }
 
         const unreadCounts = chatService.getUnreadCounts(chats);
-        sidebarContainer.replaceChildren(ChatSidebar(
+        sidebarComponent = ChatSidebar(
             chats,
             activeChat?.id,
             (chat) => {
@@ -186,7 +199,8 @@ export async function MessagesPage(initialChatId = null) {
             },
             null,
             unreadCounts
-        ));
+        );
+        sidebarContainer.replaceChildren(sidebarComponent);
     };
 
     /* ══════ Init ══════ */
@@ -233,7 +247,19 @@ export async function MessagesPage(initialChatId = null) {
                 }
             }
             pendingMsgUpdates = [];
-            renderSidebar(needsFetch);
+
+            if (needsFetch) {
+                // A chat we don't have yet — full refetch + rebuild.
+                renderSidebar(true);
+            } else if (sidebarComponent && typeof sidebarComponent.patchChats === 'function') {
+                // Pure preview-update path: patch in place so the search input,
+                // its focus/cursor, and the list scroll position survive.
+                const unreadCounts = chatService.getUnreadCounts(chats);
+                sidebarComponent.patchChats(chats, activeChat?.id, unreadCounts);
+            } else {
+                // Fallback (shouldn't happen) — full rebuild without refetch.
+                renderSidebar(false);
+            }
         }, 300);
     });
 
@@ -272,7 +298,14 @@ export async function MessagesPage(initialChatId = null) {
             }
             loadWindow(target || null);
         }
-        // If no autoOpenId and no initialChatId, just show the sidebar (already showing)
+    }
+
+    // Final fallback — if nothing has populated the chat area yet (no deep
+    // link, no autoOpenId), mount the empty-state carousel on desktop so
+    // the right side isn't blank. On mobile we leave the sidebar full-screen.
+    if (!activeChat && !isMobile && chatContainer.children.length === 0) {
+        currentWindow = ChatWindow(null);
+        chatContainer.appendChild(currentWindow);
     }
 
     container.cleanup = () => {

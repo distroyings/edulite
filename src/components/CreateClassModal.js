@@ -16,17 +16,16 @@ export function CreateClassModal(onSuccess) {
   };
 
   const container = document.createElement('div');
-  container.className = 'w-full h-full flex flex-col';
-
-  // Helper function to render the color preview based on HSL
-  const getGradient = (hue) => `linear-gradient(135deg, hsl(${hue}, 85%, 60%), hsl(${hue}, 70%, 40%))`;
+  // min-w-0 + overflow-x-hidden: ensure no child can push this flex
+  // column wider than its parent (the Modal's content box).
+  container.className = 'w-full h-full flex flex-col min-w-0 overflow-x-hidden';
 
   const render = () => {
     // Current Banner Style for Preview
     const bannerStyle = `background: ${formData.banner_url}`;
 
     container.innerHTML = `
-      <div class="flex flex-col h-full text-primary" id="class-modal-content">
+      <div class="flex flex-col h-full text-primary min-w-0" id="class-modal-content">
           
           <!-- Header -->
           <div class="mb-4 flex-shrink-0">
@@ -49,8 +48,15 @@ export function CreateClassModal(onSuccess) {
               ${renderTab('settings', 'Definições')}
           </div>
 
-          <!-- Scrollable Form Content -->
-          <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-[280px]">
+          <!-- Scrollable Form Content.
+               min-h-0   lets this flex child shrink below its natural
+                         content height (otherwise the icon grid pushes
+                         the footer outside the modal).
+               min-w-0   same for horizontal — flex would otherwise let
+                         children's natural width balloon the column.
+               overflow-x-hidden clips ring outlines and any 1-2px
+                         rounding error that would leak past the edge. -->
+          <div class="flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar min-h-0 min-w-0">
               
               <!-- TAB: GENERAL -->
               <div class="${activeTab === 'general' ? 'block' : 'hidden'} space-y-6 animate-fade-in px-1">
@@ -111,54 +117,18 @@ export function CreateClassModal(onSuccess) {
                       </div>
                   </div>
 
-                  <!-- Color Picker (Hue Slider) -->
+                  <!-- Icon Input (always-open emoji grid — the toggle was
+                       redundant since the grid itself shows the selection). -->
                   <div>
-                      <div class="flex justify-between items-end mb-3">
-                           <label class="block text-xs font-bold text-muted uppercase tracking-widest">Cor Principal</label>
-                           <div class="px-3 py-1 rounded-lg bg-white dark:bg-black/20 text-xs font-mono font-bold text-primary border border-gray-200 dark:border-white/10" id="hue-display">
-                               Azul Ocean
-                           </div>
-                      </div>
-                      
-                      <!-- Slider Track -->
-                      <div class="relative h-8 w-full rounded-xl ring-2 ring-gray-200 dark:ring-white/10 overflow-hidden">
-                          <!-- Rainbow Gradient -->
-                          <div class="absolute inset-0 w-full h-full" style="background: linear-gradient(to right, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444);"></div>
-                          
-                          <!-- Browser Range Input (Invisible but interactive) -->
-                          <input type="range" id="input-hue" min="0" max="360" value="210" 
-                              class="absolute inset-0 w-full h-full appearance-none cursor-pointer opacity-0 z-20"
-                          >
-                          
-                          <!-- Custom Thumb Indicator -->
-                          <div id="slider-thumb" class="absolute top-0 bottom-0 w-4 bg-white border-x-2 border-black/10 shadow-[0_0_15px_rgba(0,0,0,0.3)] pointer-events-none transform -translate-x-1/2 transition-transform duration-75 z-10 flex items-center justify-center" style="left: 58.33%">
-                             <div class="w-1 h-4 bg-gray-300 rounded-full"></div>
-                          </div>
-                      </div>
-                      <p class="text-[11px] text-muted mt-2.5 text-center">Desliza para personalizar a identidade visual da turma.</p>
-                  </div>
-
-                  <!-- Icon Input (Emoji Picker) -->
-                  <div>
-                       <label class="block text-xs font-bold text-muted mb-3 ml-1 uppercase tracking-widest">Ícone da Turma</label>
-                       
-                       <div class="space-y-4">
-                           <!-- Selected Icon Display & Toggle -->
-                           <div class="flex items-center gap-4 cursor-pointer group" id="icon-picker-toggle">
-                               <div class="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-3xl shadow-sm group-hover:border-neon group-hover:ring-2 group-hover:ring-neon/20 transition-all">
-                                   <span id="selected-icon-display">${formData.avatar_url || '🎓'}</span>
-                               </div>
-                               <div>
-                                   <p class="text-sm font-bold text-primary group-hover:text-neon transition-colors">Escolher Ícone</p>
-                                   <p class="text-xs text-muted">Toque para selecionar um emoji</p>
-                               </div>
-                           </div>
-
-                           <!-- Emoji Grid (Hidden by default) -->
-                           <div id="emoji-picker-container" class="hidden p-4 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/5 animate-fade-in-up">
-                               <div class="grid grid-cols-8 gap-2 max-h-[160px] overflow-y-auto scrollbar-hide" id="emoji-grid">
-                                   <!-- Populated by JS -->
-                               </div>
+                       <div class="flex items-center justify-between mb-3 ml-1">
+                           <label class="block text-xs font-bold text-muted uppercase tracking-widest">Ícone da Turma</label>
+                           <span class="text-[10.5px] text-muted/70">Escolhe um emoji</span>
+                       </div>
+                       <div class="p-2 rounded-2xl crisp-glass">
+                           <!-- p-1.5 inside the grid gives the active button's
+                                ring + scale room before overflow-y-auto clips it. -->
+                           <div class="grid grid-cols-8 gap-1.5 max-h-[200px] overflow-y-auto scrollbar-hide p-1.5" id="emoji-grid">
+                               <!-- Populated by JS -->
                            </div>
                        </div>
                   </div>
@@ -195,7 +165,7 @@ export function CreateClassModal(onSuccess) {
 
       <!-- SUCCESS SCREEN -->
       <div id="success-view" class="hidden flex-col items-center justify-center text-center py-6 h-full animate-scale-in relative">
-          <div class="w-24 h-24 bg-green-500/10 rounded-[2rem] flex items-center justify-center text-green-500 mb-8 border border-green-500/20 shadow-xl shadow-green-500/10 animate-float">
+          <div class="w-24 h-24 bg-green-500/10 rounded-[2rem] flex items-center justify-center text-green-500 mb-8 border border-green-500/20 shadow-xl shadow-green-500/10">
               <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
           </div>
           
@@ -222,7 +192,9 @@ export function CreateClassModal(onSuccess) {
 
   const renderTab = (id, label) => {
     const isActive = activeTab === id;
-    const baseClass = "tab-btn px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 relative overflow-hidden";
+    // flex-1 makes the three tabs split the available width evenly so
+    // the pill bar fills the container instead of leaving empty space.
+    const baseClass = "tab-btn flex-1 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors duration-200 relative overflow-hidden whitespace-nowrap";
     const activeClass = "bg-white dark:bg-white/10 text-primary shadow-sm dark:shadow-none ring-1 ring-black/5 dark:ring-white/10";
     const inactiveClass = "text-muted hover:text-primary hover:bg-black/5 dark:hover:bg-white/5";
     return `<button data-tab="${id}" class="${baseClass} ${isActive ? activeClass : inactiveClass}">${label}</button>`;
@@ -300,52 +272,8 @@ export function CreateClassModal(onSuccess) {
     setCheck('#input-chat', 'chat_enabled');
     setCheck('#input-locked', 'is_locked');
 
-    // Define hue logic variables (scoped within render)
-    const hueInput = container.querySelector('#input-hue');
-    const thumb = container.querySelector('#slider-thumb');
-    const hueVal = container.querySelector('#hue-display');
-    const preview = container.querySelector('#banner-preview-bg');
-    const avatarPreviewContainer = container.querySelector('#avatar-preview-container');
-
-    if (hueInput) {
-      const getHueLabel = (h) => {
-        h = parseInt(h);
-        if (h < 15 || h > 345) return 'Vermelho';
-        if (h < 45) return 'Laranja';
-        if (h < 75) return 'Amarelo';
-        if (h < 150) return 'Verde';
-        if (h < 200) return 'Ciano / Turquesa';
-        if (h < 260) return 'Azul';
-        if (h < 290) return 'Roxo';
-        return 'Rosa';
-      };
-
-      const setHue = (h) => {
-        const pct = (h / 360) * 100;
-        if (thumb) thumb.style.left = `${pct}%`;
-        if (hueVal) hueVal.textContent = getHueLabel(h);
-
-        const css = getGradient(h);
-        formData.banner_url = css;
-        formData.hue = h; // Persist hue
-        if (preview) preview.style.background = css;
-        if (avatarPreviewContainer) avatarPreviewContainer.style.background = css;
-      };
-
-      hueInput.oninput = (e) => setHue(e.target.value);
-
-      // Restore State
-      if (formData.hue !== undefined) {
-        hueInput.value = formData.hue;
-        setHue(formData.hue); // Visual update
-      }
-    }
-
     // --- Emoji Picker Logic ---
-    const pickerToggle = container.querySelector('#icon-picker-toggle');
-    const pickerContainer = container.querySelector('#emoji-picker-container');
     const emojiGrid = container.querySelector('#emoji-grid');
-    const displayIcon = container.querySelector('#selected-icon-display');
     const previewIcon = container.querySelector('#logo-preview-icon');
 
     // Default icon update
@@ -358,38 +286,29 @@ export function CreateClassModal(onSuccess) {
       '⏰', '📅', '📌', '📖', '🧱', '🛠️', '⚖️', '💶'
     ];
 
-    if (pickerToggle) {
-      pickerToggle.onclick = () => {
-        pickerContainer.classList.toggle('hidden');
-        // Scroll to bottom so picker is visible
-        const content = container.querySelector('.overflow-y-auto');
-        if (content) setTimeout(() => content.scrollTo({ top: content.scrollHeight, behavior: 'smooth' }), 50);
-      };
-    }
-
     if (emojiGrid) {
+      const ACTIVE_CLASSES = ['bg-neon/15', 'ring-2', 'ring-neon', 'shadow-md', 'shadow-neon/30', 'scale-[1.08]'];
+      const INACTIVE_CLASSES = ['hover:bg-black/[0.04]', 'dark:hover:bg-white/[0.06]', 'hover:scale-110'];
+
+      const buildClass = (isActive) =>
+        `aspect-square flex items-center justify-center text-[22px] rounded-xl transition-all duration-150 active:scale-95 ${
+          isActive ? ACTIVE_CLASSES.join(' ') : INACTIVE_CLASSES.join(' ')
+        }`;
+
       emojiGrid.innerHTML = emojis.map(emo => `
-            <button type="button" class="aspect-square flex items-center justify-center text-2xl hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-colors ${emo === (formData.avatar_url || '🎓') ? 'bg-neon/20 ring-2 ring-neon/50' : ''}" data-emoji="${emo}">
-                ${emo}
-            </button>
-        `).join('');
+        <button type="button" class="${buildClass(emo === (formData.avatar_url || '🎓'))}" data-emoji="${emo}">${emo}</button>
+      `).join('');
 
       emojiGrid.querySelectorAll('button').forEach(btn => {
         btn.onclick = (e) => {
-          e.stopPropagation(); // prevent modal close if clicked
+          e.stopPropagation();
           const emo = btn.dataset.emoji;
           formData.avatar_url = emo;
-
-          // Update Inputs & Displays
-          if (displayIcon) displayIcon.textContent = emo;
           if (previewIcon) previewIcon.textContent = emo;
-
-          // Highlight selection
-          emojiGrid.querySelectorAll('button').forEach(b => b.classList.remove('bg-neon/20', 'ring-2', 'ring-neon/50'));
-          btn.classList.add('bg-neon/20', 'ring-2', 'ring-neon/50');
-
-          // Close picker
-          pickerContainer.classList.add('hidden');
+          // Re-style every button in one pass so only the new one is active.
+          emojiGrid.querySelectorAll('button').forEach(b => {
+            b.className = buildClass(b.dataset.emoji === emo);
+          });
         };
       });
     }

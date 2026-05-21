@@ -9,8 +9,8 @@ export const analyticsService = {
     async getClassGradeBook(classId) {
         if (!supabase) return { data: null, error: { message: 'Supabase not configured' } };
 
-        // Parallel fetch: members, assignments, all submissions
-        const [membersRes, assignRes, subRes] = await Promise.all([
+        // First fetch members + assignments in parallel; submissions need assignment IDs.
+        const [membersRes, assignRes] = await Promise.all([
             supabase
                 .from('class_members')
                 .select('user_id, role, profiles:user_id(id, name, avatar_url, username, is_verified)')
@@ -20,14 +20,6 @@ export const analyticsService = {
                 .select('id, title, due_at, has_grading, max_grade, created_at')
                 .eq('class_id', classId)
                 .order('created_at', { ascending: true }),
-            supabase
-                .from('submissions')
-                .select('id, assignment_id, user_id, grade, status, submitted_at, graded_at')
-                .in('assignment_id',
-                    // We need assignment ids, but we can't sub-query easily—
-                    // so we'll filter after fetching
-                    []
-                )
         ]);
 
         if (membersRes.error) return { data: null, error: membersRes.error };
@@ -36,7 +28,6 @@ export const analyticsService = {
         const assignments = assignRes.data || [];
         const assignmentIds = assignments.map(a => a.id);
 
-        // Now fetch submissions for these assignments
         let submissions = [];
         if (assignmentIds.length > 0) {
             const { data: subs, error: subError } = await supabase

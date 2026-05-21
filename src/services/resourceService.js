@@ -102,14 +102,21 @@ export const resourceService = {
 
 
     async uploadFile(classId, file) {
-        if (!supabase) return { url: null, error: { message: 'Supabase not configured' } };
+        if (!supabase) return { url: null, path: null, error: { message: 'Supabase not configured' } };
         const ext = file.name.split('.').pop();
         const path = `${classId}/${generateUUID()}.${ext}`;
 
         const { error } = await supabase.storage.from('resources').upload(path, file);
-        if (error) return { url: null, error };
+        if (error) return { url: null, path: null, error };
 
         const { data: { publicUrl } } = supabase.storage.from('resources').getPublicUrl(path);
-        return { url: publicUrl, error: null };
+        return { url: publicUrl, path, error: null };
+    },
+
+    async deleteUploadedFile(path) {
+        if (!supabase || !path) return;
+        try {
+            await supabase.storage.from('resources').remove([path]);
+        } catch (e) { console.warn('Resource file cleanup failed', e); }
     },
 };

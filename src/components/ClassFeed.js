@@ -122,7 +122,7 @@ export function ClassFeed(classId, container, isOwner) {
                         <!-- Comment input -->
                         <div class="flex items-center gap-2 px-5 py-3 border-t border-gray-100 dark:border-white/[0.04]">
                             <input type="text" placeholder="Escreve um comentário..." maxlength="300"
-                                class="cf-comment-input flex-1 h-9 px-4 text-xs rounded-xl bg-white dark:bg-white/[0.06] border border-gray-200 dark:border-white/10 text-primary placeholder:text-gray-400 focus:outline-none focus:border-neon/30 focus:ring-2 focus:ring-neon/10 transition-all"
+                                class="cf-comment-input flex-1 h-9 px-4 text-xs rounded-xl bg-white dark:bg-white/[0.06] border border-gray-200 dark:border-white/10 text-primary placeholder:text-gray-400 focus:outline-none focus:border-neon/30 focus:ring-2 focus:ring-neon/10 transition-colors"
                                 data-note="${note.id}">
                             <button class="cf-send-comment p-2 rounded-xl text-neon hover:bg-neon/10 active:scale-90 transition-all" data-note="${note.id}">
                                 ${IC.send}
