@@ -386,6 +386,46 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public, pg_temp;
 GRANT EXECUTE ON FUNCTION private.is_chat_member(uuid) TO authenticated, anon;
 
 
+-- ══════════════════════════════════════
+--  Notification housekeeping triggers
+-- ══════════════════════════════════════
+-- notifications.reference_id is a polymorphic pointer (assignment id,
+-- class_note id, resource id, quiz id, submission id). No single FK
+-- can model that, so we attach an AFTER DELETE trigger to each source
+-- table that removes any notification still pointing at the deleted
+-- row. Done at the DB level so admin tools, direct SQL, future code
+-- paths and CASCADE-deletes all stay consistent.
+
+CREATE OR REPLACE FUNCTION private.cleanup_notifications_for_deleted_row()
+RETURNS trigger AS $$
+BEGIN
+    DELETE FROM public.notifications
+    WHERE reference_id = OLD.id;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+CREATE TRIGGER cleanup_notifs_assignments
+    AFTER DELETE ON public.assignments
+    FOR EACH ROW EXECUTE FUNCTION private.cleanup_notifications_for_deleted_row();
+
+CREATE TRIGGER cleanup_notifs_class_notes
+    AFTER DELETE ON public.class_notes
+    FOR EACH ROW EXECUTE FUNCTION private.cleanup_notifications_for_deleted_row();
+
+CREATE TRIGGER cleanup_notifs_class_resources
+    AFTER DELETE ON public.class_resources
+    FOR EACH ROW EXECUTE FUNCTION private.cleanup_notifications_for_deleted_row();
+
+CREATE TRIGGER cleanup_notifs_quizzes
+    AFTER DELETE ON public.quizzes
+    FOR EACH ROW EXECUTE FUNCTION private.cleanup_notifications_for_deleted_row();
+
+CREATE TRIGGER cleanup_notifs_submissions
+    AFTER DELETE ON public.submissions
+    FOR EACH ROW EXECUTE FUNCTION private.cleanup_notifications_for_deleted_row();
+
+
 -- ══════════════════════════════════════════════════════════════
 --  ROW LEVEL SECURITY (RLS)
 -- ══════════════════════════════════════════════════════════════
