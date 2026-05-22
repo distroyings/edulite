@@ -48,15 +48,59 @@ export class Modal {
 
         this.overlay.appendChild(this.container);
         this.onClose = onClose;
+
+        // Backdrop click to close — only when clicking the overlay itself,
+        // not bubbled clicks from inside the container.
+        this.overlay.addEventListener('mousedown', (e) => {
+            if (e.target === this.overlay) this.close();
+        });
+
+        // Keyboard: Escape closes, Tab is trapped inside.
+        // Storing the bound handler so we can detach it on close.
+        this._onKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                this.close();
+                return;
+            }
+            if (e.key === 'Tab') this._trapTab(e);
+        };
+    }
+
+    /** Keep Tab focus inside the modal — without this, pressing Tab
+     *  past the last focusable element jumps back to the page behind. */
+    _trapTab(e) {
+        const focusables = this.container.querySelectorAll(
+            'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && active === first) { last.focus(); e.preventDefault(); }
+        else if (!e.shiftKey && active === last) { first.focus(); e.preventDefault(); }
     }
 
     open() {
+        // Remember what to restore focus to when the modal closes.
+        this._previouslyFocused = document.activeElement;
+
         document.body.appendChild(this.overlay);
         // Force reflow
         this.overlay.offsetHeight;
         this.overlay.classList.remove('opacity-0');
         this.container.classList.remove('scale-90', 'opacity-0');
         this.container.classList.add('scale-100', 'opacity-100');
+
+        // Hook keyboard listener and pull focus into the modal.
+        document.addEventListener('keydown', this._onKeyDown);
+        // Defer focus so the open animation starts before we steal focus.
+        setTimeout(() => {
+            const firstInput = this.container.querySelector(
+                'input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])'
+            );
+            (firstInput || this.container).focus({ preventScroll: true });
+        }, 50);
     }
 
     close() {
@@ -64,9 +108,15 @@ export class Modal {
         this.container.classList.remove('scale-100', 'opacity-100');
         this.container.classList.add('scale-90', 'opacity-0');
 
+        document.removeEventListener('keydown', this._onKeyDown);
+
         setTimeout(() => {
             if (this.overlay.parentNode) {
                 this.overlay.parentNode.removeChild(this.overlay);
+            }
+            // Restore focus to the element that opened the modal.
+            if (this._previouslyFocused && typeof this._previouslyFocused.focus === 'function') {
+                try { this._previouslyFocused.focus({ preventScroll: true }); } catch { /* ignore */ }
             }
             if (this.onClose) this.onClose();
         }, 300);
