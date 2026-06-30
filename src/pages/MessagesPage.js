@@ -308,8 +308,17 @@ export async function MessagesPage(initialChatId = null) {
         chatContainer.appendChild(currentWindow);
     }
 
+    const onChatRead = () => {
+        if (sidebarComponent && typeof sidebarComponent.patchChats === 'function') {
+            const unreadCounts = chatService.getUnreadCounts(chats);
+            sidebarComponent.patchChats(chats, activeChat?.id, unreadCounts);
+        }
+    };
+    window.addEventListener('chat:read', onChatRead);
+
     container.cleanup = () => {
         window.removeEventListener('resize', onResize);
+        window.removeEventListener('chat:read', onChatRead);
         if (currentWindow?.cleanup) currentWindow.cleanup();
         clearTimeout(sidebarRefreshTimer);
         clearTimeout(navHideTimer);

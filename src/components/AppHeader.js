@@ -454,6 +454,7 @@ export async function AppHeader() {
             } catch(e) {}
         };
         updateChatBadge();
+        window.addEventListener('chat:read', updateChatBadge);
 
         realtimeManager.subscribe('appheader:messages', 'messages', null, ['INSERT'], (payload) => {
             const path = window.location.pathname;

@@ -348,6 +348,7 @@ export const chatService = {
             const data = JSON.parse(localStorage.getItem(key) || '{}');
             data[chatId] = new Date().toISOString();
             localStorage.setItem(key, JSON.stringify(data));
+            window.dispatchEvent(new CustomEvent('chat:read', { detail: { chatId } }));
         } catch { }
     },
 
