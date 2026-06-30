@@ -1337,6 +1337,7 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
     const refreshCurrentTab = () => {
         const currentTab = document.querySelector('.tab-btn.text-primary, .tab-btn.bg-white, .tab-btn[class*="dark:bg-white/10"]');
         if (currentTab?.id === 'tab-stream') reloadAssignments();
+        if (currentTab?.id === 'tab-notes' && feedInstance) feedInstance.refresh();
     };
 
     realtimeManager.subscribe(`class:${classId}:assignments`, 'assignments',

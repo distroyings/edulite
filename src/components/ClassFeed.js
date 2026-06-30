@@ -217,7 +217,7 @@ export function ClassFeed(classId, container, isOwner) {
                     <img src="${p.avatar_url || ''}" alt="" class="w-7 h-7 rounded-full object-cover bg-gray-200 dark:bg-white/10 mt-0.5 flex-shrink-0 ring-1 ring-white/50 dark:ring-white/5 ${p.username ? 'cursor-pointer hover:ring-neon/40 transition-all' : ''}"
                         loading="lazy" ${p.username ? `onclick="window.history.pushState({}, '', '/profile/${p.username}'); window.dispatchEvent(new Event('popstate'));"` : ''}
                         onerror="this.style.visibility='hidden'">
-                    <div class="flex-1 min-w-0 bg-white dark:bg-white/[0.04] rounded-xl rounded-tl-sm px-3 py-2 border border-gray-100 dark:border-white/[0.06]">
+                    <div class="w-fit max-w-[85%] min-w-0 bg-white dark:bg-white/[0.04] rounded-xl rounded-tl-sm px-3 py-2 border border-gray-100 dark:border-white/[0.06]">
                         <div class="flex items-baseline gap-1.5 mb-0.5">
                             <span class="text-[11px] font-bold text-primary ${p.username ? 'cursor-pointer hover:text-neon transition-colors' : ''}" ${p.username ? `onclick="window.history.pushState({}, '', '/profile/${p.username}'); window.dispatchEvent(new Event('popstate'));"` : ''}>${esc(p.name || 'Anónimo')}</span>
                             ${verifiedBadge(p.is_verified, 'sm')}
