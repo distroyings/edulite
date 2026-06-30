@@ -951,13 +951,13 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
                 exportMembersBtn.onclick = () => {
                     const csvCell = (v) => {
                         const s = String(v ?? '');
-                        return (s.includes(',') || s.includes('"') || s.includes('\n')) ? '"' + s.replace(/"/g, '""') + '"' : s;
+                        return (s.includes(',') || s.includes(';') || s.includes('"') || s.includes('\n')) ? '"' + s.replace(/"/g, '""') + '"' : s;
                     };
                     const allMembers = [...teachers.map(m => ({ ...m, _role: 'Professor' })), ...students.map(m => ({ ...m, _role: 'Aluno' }))];
-                    const headers = ['#', 'Nome', 'Username', 'Papel'].map(h => csvCell(h)).join(';');
+                    const headers = ['#', 'Nome', 'Username', 'Papel'].map(h => csvCell(h)).join(',');
                     const rows = allMembers.map((m, i) => {
                         const p = m.profiles;
-                        return [csvCell(i + 1), csvCell(p.name || ''), csvCell(p.username || ''), csvCell(m._role)].join(';');
+                        return [csvCell(i + 1), csvCell(p.name || ''), csvCell(p.username || ''), csvCell(m._role)].join(',');
                     });
                     const csv = [headers, ...rows].join('\n');
                     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });

@@ -371,7 +371,7 @@ function csvCell(value) {
     if (value === null || value === undefined) return '';
     const str = String(value);
     // Escape if contains comma, quote, newline, or starts with special chars
-    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r') || str.startsWith('=') || str.startsWith('+') || str.startsWith('-') || str.startsWith('@')) {
+    if (str.includes(',') || str.includes(';') || str.includes('"') || str.includes('\n') || str.includes('\r') || str.startsWith('=') || str.startsWith('+') || str.startsWith('-') || str.startsWith('@')) {
         return '"' + str.replace(/"/g, '""') + '"';
     }
     return str;
@@ -426,12 +426,12 @@ function exportCSV(students, assignments, stats) {
     ];
 
     const csv = [
-        headers.map(h => csvCell(h)).join(';'),
-        ...rows.map(r => r.join(';')),
+        headers.map(h => csvCell(h)).join(','),
+        ...rows.map(r => r.join(',')),
         '', // empty line before summary
-        summaryRow.join(';'),
+        summaryRow.join(','),
         '', // metadata footer
-        `${csvCell('Gerado por EduLite')};${csvCell(datestamp)};${csvCell(students.length + ' alunos')};${csvCell(assignments.length + ' tarefas')}`
+        `${csvCell('Gerado por EduLite')},${csvCell(datestamp)},${csvCell(students.length + ' alunos')},${csvCell(assignments.length + ' tarefas')}`
     ].join('\n');
 
     downloadFile('\uFEFF' + csv, `notas_turma_${datestamp}.csv`, 'text/csv;charset=utf-8;');

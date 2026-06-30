@@ -310,8 +310,10 @@ export function ResourceLibrary(classId, container, isOwner) {
                         ${selectedFiles.length < 3 ? `
                             <label class="flex items-center justify-center gap-2 w-full h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/10 hover:border-neon/40 transition-all cursor-pointer bg-gray-50/50 dark:bg-white/[0.02]">
                                 <input type="file" id="rl-file" class="hidden" multiple>
-                                <div class="text-center">
-                                    <div class="text-muted mb-0.5">${ICONS.plus}</div>
+                                <div class="text-center flex flex-col items-center">
+                                    <div class="w-8 h-8 mb-2 rounded-full bg-neon/10 text-neon flex items-center justify-center">
+                                        ${ICONS.plus}
+                                    </div>
                                     <span class="text-xs text-muted font-medium">${selectedFiles.length > 0 ? 'Adicionar mais ficheiros' : 'Clica para escolher ficheiros'}</span>
                                 </div>
                             </label>
@@ -575,8 +577,10 @@ export function ResourceLibrary(classId, container, isOwner) {
                         ${resource.file_url ? `<p class="text-[10px] text-muted mb-1.5">Ficheiro atual: <a href="${resource.file_url}" target="_blank" class="text-neon underline">ver ficheiro</a>. Envie outro para substituir.</p>` : ''}
                         <label class="flex items-center justify-center gap-2 w-full h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/10 hover:border-neon/40 transition-all cursor-pointer bg-gray-50/50 dark:bg-white/[0.02]">
                             <input type="file" id="rle-file" class="hidden">
-                            <div class="text-center">
-                                <div class="text-muted mb-0.5">${ICONS.plus}</div>
+                            <div class="text-center flex flex-col items-center">
+                                <div class="w-8 h-8 mb-2 rounded-full bg-neon/10 text-neon flex items-center justify-center">
+                                    ${ICONS.plus}
+                                </div>
                                 <span id="rle-file-label" class="text-xs text-muted font-medium">Clica para substituir ficheiro</span>
                             </div>
                         </label>
