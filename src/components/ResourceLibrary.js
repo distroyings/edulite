@@ -115,7 +115,8 @@ export function ResourceLibrary(classId, container, isOwner) {
     function renderResource(r, index = 0) {
         const type = r.resource_type || 'file';
         const style = TYPE_STYLE[type] || TYPE_STYLE.file;
-        const url = r.file_url || r.link_url;
+        let url = r.file_url || r.link_url;
+        if (url && !/^https?:\/\//i.test(url) && r.link_url) url = 'https://' + url;
         const delay = Math.min(index * 50, 250);
 
         return `
