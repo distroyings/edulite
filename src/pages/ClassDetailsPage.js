@@ -238,7 +238,6 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
 
     // Initial active tab — load the tab requested in the URL (or default to stream)
     const resolvedInitialTab = tabDefs.find(td => td.id === initialTab) ? initialTab : 'stream';
-    switchTab(resolvedInitialTab);
 
     // ═══════════════════════════════════════════════════
     //  STREAM TAB (Assignments)
@@ -1337,8 +1336,9 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
     }
 
     // ═══════════════════════════════════════════════════
-    //  INITIAL LOAD HANDLED EARLIER VIA TIMEOUT
+    //  INITIAL LOAD
     // ═══════════════════════════════════════════════════
+    switchTab(resolvedInitialTab);
 
     // ═══════════════════════════════════════════════════
     //  REAL-TIME SUBSCRIPTIONS
