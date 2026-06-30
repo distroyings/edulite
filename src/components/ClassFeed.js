@@ -214,7 +214,7 @@ export function ClassFeed(classId, container, isOwner) {
             const p = c.profiles || {};
             return `
                 <div class="flex items-start gap-2.5 cf-card" style="animation-delay:${i * 40}ms">
-                    <img src="${p.avatar_url || ''}" alt="" class="w-7 h-7 rounded-full object-cover bg-gray-200 dark:bg-white/10 mt-0.5 flex-shrink-0 ring-1 ring-white/50 dark:ring-white/5 ${p.username ? 'cursor-pointer hover:ring-neon/40 transition-all' : ''}"
+                    <img src="${p.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'User')}&background=random`}" alt="" class="w-7 h-7 rounded-full object-cover bg-gray-200 dark:bg-white/10 mt-0.5 flex-shrink-0 ring-1 ring-white/50 dark:ring-white/5 ${p.username ? 'cursor-pointer hover:ring-neon/40 transition-all' : ''}"
                         loading="lazy" ${p.username ? `onclick="window.history.pushState({}, '', '/profile/${p.username}'); window.dispatchEvent(new Event('popstate'));"` : ''}
                         onerror="this.style.visibility='hidden'">
                     <div class="w-fit max-w-[85%] min-w-0 bg-white dark:bg-white/[0.04] rounded-xl rounded-tl-sm px-3 py-2 border border-gray-100 dark:border-white/[0.06]">
