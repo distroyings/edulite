@@ -146,10 +146,10 @@ export function ResourceLibrary(classId, container, isOwner) {
                             </a>
                         ` : ''}
                         ${isOwner ? `
-                            <button class="rl-edit-btn p-2 rounded-xl text-gray-400 hover:text-neon hover:bg-neon/10 transition-all active:scale-90 md:opacity-0 md:group-hover/r:opacity-100" data-id="${r.id}" title="Editar">
+                            <button class="rl-edit-btn p-2 rounded-xl text-gray-400 hover:text-neon hover:bg-neon/10 transition-all active:scale-90" data-id="${r.id}" title="Editar">
                                 ${ICONS.edit}
                             </button>
-                            <button class="rl-del-btn p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90 md:opacity-0 md:group-hover/r:opacity-100" data-id="${r.id}" title="Eliminar">
+                            <button class="rl-del-btn p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90" data-id="${r.id}" title="Eliminar">
                                 ${ICONS.trash}
                             </button>
                         ` : ''}
