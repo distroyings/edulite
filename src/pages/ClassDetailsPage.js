@@ -588,7 +588,7 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
                         <input type="file" id="class-chat-file" class="hidden">
                         <button type="button" id="class-chat-attach" class="p-2.5 rounded-xl text-gray-400 hover:text-neon hover:bg-neon/[0.06] transition-all active:scale-90 flex-shrink-0">${I.attach}</button>
                         <input type="text" id="class-chat-input" placeholder="Escreve uma mensagem..." maxlength="500"
-                            class="flex-1 bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-neon/20 rounded-xl px-4 py-2.5 text-sm text-primary placeholder:text-gray-400 focus:outline-none focus:bg-white dark:focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(var(--color-neon-rgb)/0.06)] transition-all" autocomplete="off">
+                            class="flex-1 bg-gray-100/80 dark:bg-white/[0.06] border border-transparent focus:border-transparent rounded-xl px-4 py-2.5 text-sm text-primary placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-neon/30 focus:bg-white dark:focus:bg-white/10 transition-all" autocomplete="off">
                         <button id="class-chat-send" class="p-2.5 rounded-xl text-white bg-gradient-to-br from-neon to-blue-600 hover:shadow-lg hover:shadow-neon/25 transition-all active:scale-90 flex-shrink-0 disabled:opacity-20 disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none dark:disabled:from-white/10 dark:disabled:to-white/5" disabled>
                             ${I.send}
                         </button>
