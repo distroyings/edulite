@@ -63,17 +63,17 @@ class RealtimeManager {
         // same key is re-registered after a re-mount.
         const channel = supabase.channel(`rt:${key}:${generateUUID()}`);
 
-        events.forEach(event => {
-            const opts = { event, schema: 'public', table };
-            if (filterStr) opts.filter = filterStr;
-            channel.on('postgres_changes', opts, (payload) => {
-                const data = payload.eventType === 'DELETE' ? payload.old : payload.new;
-                try {
-                    callback({ table, event: payload.eventType, data });
-                } catch (e) {
-                    console.error(`[RT] callback error in ${key}:`, e);
-                }
-            });
+        const opts = { event: '*', schema: 'public', table };
+        if (filterStr) opts.filter = filterStr;
+
+        channel.on('postgres_changes', opts, (payload) => {
+            if (!events.includes(payload.eventType)) return;
+            const data = payload.eventType === 'DELETE' ? payload.old : payload.new;
+            try {
+                callback({ table, event: payload.eventType, data });
+            } catch (e) {
+                console.error(`[RT] callback error in ${key}:`, e);
+            }
         });
 
         channel.subscribe();

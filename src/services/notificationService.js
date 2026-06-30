@@ -92,25 +92,24 @@ export const notificationService = {
      */
     subscribeToNotifications(userId, callback) {
         if (!supabase || !userId) return null;
+        
+        // Import realtimeManager lazily to avoid circular dependencies if any
+        import('../lib/RealtimeManager.js').then(({ realtimeManager }) => {
+            realtimeManager.subscribe(`notif:${userId}`, 'notifications', { column: 'user_id', value: userId }, ['INSERT'], (payload) => {
+                if (payload.event === 'INSERT') {
+                    try { callback(payload.data); } catch (e) { console.error('notification callback:', e); }
+                }
+            });
+        });
 
-        const channel = supabase
-            .channel(`notif:${userId}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${userId}`,
-            }, (payload) => {
-                try { callback(payload.new); } catch (e) { console.error('notification callback:', e); }
-            })
-            .subscribe();
-
-        return channel;
+        return `notif:${userId}`; // Return the key for unsubscription
     },
 
-    unsubscribe(channel) {
-        if (supabase && channel) {
-            try { supabase.removeChannel(channel); } catch { /* ignore */ }
+    unsubscribe(key) {
+        if (key) {
+            import('../lib/RealtimeManager.js').then(({ realtimeManager }) => {
+                realtimeManager.unsubscribe(key);
+            });
         }
     },
 

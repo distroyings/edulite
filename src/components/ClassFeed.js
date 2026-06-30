@@ -261,7 +261,17 @@ function esc(str) {
 }
 
 function linkify(text) {
-    return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" class="text-neon hover:underline break-all">$1</a>');
+    const urlRegex = /(https?:\/\/[^\s<]+|(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s<]*)?)/ig;
+    return text.replace(urlRegex, (match) => {
+        if (!match.startsWith('http') && !match.startsWith('www') && !/\.(com|org|net|pt|io|me|co|space|info|edu|gov)(\/|$)/i.test(match)) {
+            return match; // Ignore normal text that happens to match (like file.name)
+        }
+        let href = match;
+        if (!/^https?:\/\//i.test(href)) {
+            href = 'https://' + href;
+        }
+        return `<a href="${href}" target="_blank" class="text-neon hover:underline break-all">${match}</a>`;
+    });
 }
 
 function getTimeAgo(dateStr) {

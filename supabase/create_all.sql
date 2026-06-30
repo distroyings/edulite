@@ -755,3 +755,6 @@ ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 10485760,
 
 CREATE POLICY "Upload resource files" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'resources');
 CREATE POLICY "Delete resource files" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'resources');
+
+-- Add quizzes to Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.quizzes;

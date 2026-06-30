@@ -88,7 +88,7 @@ export function QuizListComponent(classId, isOwner, onRefresh) {
                                 <button class="quiz-stats-btn p-2 rounded-lg text-muted hover:text-neon hover:bg-neon/5 transition-colors" data-id="${quiz.id}" title="Estatísticas">
                                     ${IC.chart}
                                 </button>
-                                <button class="quiz-del-btn p-2 rounded-lg text-muted hover:text-red-500 hover:bg-red-500/5 transition-colors md:opacity-0 md:group-hover:opacity-100" data-id="${quiz.id}" title="Eliminar">
+                                <button class="quiz-del-btn p-2 rounded-lg text-muted hover:text-red-500 hover:bg-red-500/5 transition-colors" data-id="${quiz.id}" title="Eliminar">
                                     ${IC.trash}
                                 </button>
                             ` : `

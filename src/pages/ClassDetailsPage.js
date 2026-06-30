@@ -415,7 +415,16 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
         // Process content: @mentions + URLs
         let content = escapeHtml(msg.content);
         content = content.replace(/@([a-zA-Z0-9_]+)/g, (m, u) => `<span class="text-neon cursor-pointer hover:underline font-semibold mention-link" data-username="${u}">${m}</span>`);
-        content = content.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" class="underline underline-offset-2 opacity-80 hover:opacity-100">$1</a>');
+        content = content.replace(/(https?:\/\/[^\s<]+|(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s<]*)?)/ig, (match) => {
+            if (!match.startsWith('http') && !match.startsWith('www') && !/\.(com|org|net|pt|io|me|co|space|info|edu|gov)(\/|$)/i.test(match)) {
+                return match; 
+            }
+            let href = match;
+            if (!/^https?:\/\//i.test(href)) {
+                href = 'https://' + href;
+            }
+            return `<a href="${href}" target="_blank" class="underline underline-offset-2 opacity-80 hover:opacity-100">${match}</a>`;
+        });
 
         // File attachment rendering
         let fileHtml = '';
@@ -1341,6 +1350,9 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
     };
 
     realtimeManager.subscribe(`class:${classId}:assignments`, 'assignments',
+        { column: 'class_id', value: classId },
+        ['INSERT', 'UPDATE', 'DELETE'], () => reloadAssignments());
+    realtimeManager.subscribe(`class:${classId}:quizzes`, 'quizzes',
         { column: 'class_id', value: classId },
         ['INSERT', 'UPDATE', 'DELETE'], () => reloadAssignments());
     // Feed posts live in class_notes. The CDC filter scopes events to
