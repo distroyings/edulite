@@ -812,6 +812,9 @@ export async function ClassDetailsPage(classId, initialTab = 'stream') {
             'application/pdf', 'text/plain', 'application/zip',
             'audio/mpeg', 'audio/wav', 'audio/ogg',
             'video/mp4', 'video/webm',
+            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         ]);
         attachBtn.onclick = () => fileInput.click();
         fileInput.onchange = () => {

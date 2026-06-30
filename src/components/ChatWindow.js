@@ -42,6 +42,9 @@ const CHAT_ALLOWED_MIME = new Set([
     'application/pdf', 'text/plain', 'application/zip',
     'audio/mpeg', 'audio/wav', 'audio/ogg',
     'video/mp4', 'video/webm',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]);
 
 const validateChatFile = (file) => {
